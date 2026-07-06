@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>meetfit — 가장 회의하기 좋은 시간을 제안합니다</title>
+<link rel="icon" type="image/png" href="assets/symbol.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ============ Sidebar (desktop) — Zoom-style icon+label nav ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="assets/symbol.png" alt="" class="brand-symbol">
+      <img src="assets/type.png" alt="meetfit" class="brand-type">
+    </div>
+    <nav class="nav-group">
+      <button class="nav-item active" data-nav="home">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9a1 1 0 001 1h10a1 1 0 001-1v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        홈
+      </button>
+      <button class="nav-item" data-nav="create">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 14v4M10 16h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        회의 만들기
+      </button>
+      <button class="nav-item" data-nav="profile">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        나의 회의 프로필
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-avatar">나</div>
+      <div class="user-meta">
+        <div class="user-name">나</div>
+        <div class="user-email">onlyone728@gmail.com</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ Mobile topbar ============ -->
+  <div class="topbar">
+    <div class="brand" style="padding:0;">
+      <img src="assets/symbol.png" alt="" class="brand-symbol" style="width:24px;height:24px;">
+      <img src="assets/type.png" alt="meetfit" class="brand-type" style="height:14px;">
+    </div>
+  </div>
+
+  <main class="main-scroll">
+
+    <!-- ================= Screen 00 — 홈 (예정/지난 회의 리스트) ================= -->
+    <section class="screen active" id="screen-home">
+      <div class="screen-header home-header">
+        <div>
+          <h1>회의</h1>
+          <p class="screen-subtitle">예정된 회의와 지난 회의를 한눈에 확인하세요.</p>
+        </div>
+        <button class="btn btn-primary" id="new-meeting-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          새 회의 예약하기
+        </button>
+      </div>
+
+      <div class="list-section">
+        <h2 class="list-section-title">예정된 회의</h2>
+        <div id="upcoming-list"><!-- injected by JS --></div>
+      </div>
+
+      <div class="list-section">
+        <h2 class="list-section-title">지난 회의</h2>
+        <div id="past-list"><!-- injected by JS --></div>
+      </div>
+    </section>
+
+    <!-- ================= Screen 02 — 회의 만들기 ================= -->
+    <section class="screen" id="screen-create">
+      <div class="screen-header">
+        <h1>회의 만들기</h1>
+        <p class="screen-subtitle">참석자만 선택하세요. 시간 비교는 저희가 대신 해드려요.</p>
+      </div>
+
+      <div class="stepper">
+        <span class="stepper-step current" data-step="recommend">추천</span>
+        <span class="stepper-arrow">→</span>
+        <span class="stepper-step" data-step="verify">검증</span>
+        <span class="stepper-arrow">→</span>
+        <span class="stepper-step" data-step="book">예약</span>
+      </div>
+
+      <!-- Step A: form -->
+      <div id="meeting-form">
+        <div class="card">
+          <div class="card-title">회의 일정</div>
+          <div class="field">
+            <label class="field-label" for="meeting-date-input">날짜</label>
+            <div class="chip-group date-quick-group">
+              <div class="chip">
+                <input type="radio" name="date-quick" id="date-quick-today">
+                <label for="date-quick-today">오늘</label>
+              </div>
+              <div class="chip">
+                <input type="radio" name="date-quick" id="date-quick-tomorrow">
+                <label for="date-quick-tomorrow">내일</label>
+              </div>
+            </div>
+            <input type="date" class="select" id="meeting-date-input">
+          </div>
+          <div class="field" style="margin-top: var(--space-5);">
+            <label class="field-label" for="duration-select">회의 시간</label>
+            <select class="select" id="duration-select">
+              <option>30분</option>
+              <option selected>1시간</option>
+              <option>1시간 30분</option>
+              <option>2시간</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">참석자 <span class="count-badge" id="attendee-count">0명</span></div>
+          <p class="card-desc">필참으로 설정하면 이 인원이 모두 가능한 시간만 추천돼요.</p>
+          <ul class="attendee-list" id="attendee-list"><!-- injected by JS --></ul>
+          <button type="button" class="btn btn-ghost btn-block add-attendee-btn" id="add-attendee-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            참석자 추가
+          </button>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="find-time-btn" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.8"/></svg>
+          회의하기 좋은 시간 찾기
+        </button>
+        <p class="card-desc hint find-time-hint" id="find-time-hint">참석자를 1명 이상 추가하면 좋은 시간을 찾아드려요.</p>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-wrap" id="loading-wrap" style="display:none;">
+        <div class="spinner"></div>
+        <span>6명의 업무 맥락을 분석하고 있어요…</span>
+      </div>
+
+      <!-- Step B: results -->
+      <div id="meeting-results" style="display:none;">
+        <div class="results-header">
+          <button class="btn btn-text" id="edit-attendees-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            참석자 다시 선택
+          </button>
+        </div>
+
+        <div class="hero-card">
+          <p class="hero-eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>
+            가장 회의하기 좋은 시간을 찾았어요
+          </p>
+          <div class="hero-time" id="hero-time">오늘 오후 2:00 – 3:00</div>
+
+          <div class="hero-score-row">
+            <div class="score-badge score-badge--xl" id="hero-score">96<span class="score-unit">점</span></div>
+            <div class="score-meta">
+              <div class="stars" aria-hidden="true">★★★★★</div>
+              <div class="score-label score-label--great" id="hero-score-label">매우 적합</div>
+            </div>
+          </div>
+
+          <div class="attendance-row">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            참석률 <b id="hero-attendance">100%</b>&nbsp;· 필참 모두 참석 가능
+          </div>
+
+          <div class="hero-actions">
+            <button class="btn btn-primary btn-block" data-action="book" data-slot="1">이 시간으로 예약</button>
+            <button type="button" class="btn btn-ghost btn-block evidence-toggle" id="hero-evidence-toggle" aria-expanded="false" aria-controls="hero-evidence-panel">
+              <span class="evidence-toggle-label">적합도 근거 보기</span>
+              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="evidence-panel" id="hero-evidence-panel">
+          <div class="evidence-panel-inner">
+            <div class="card">
+              <div class="card-title">회의 적합도 계산 기준</div>
+              <div class="criteria-list" id="hero-criteria"><!-- injected by JS --></div>
+            </div>
+            <div class="card">
+              <div class="card-title">참석자별 회의 적합도</div>
+              <p class="card-desc">사람 중심으로 구성했어요. 각 셀을 눌러 이유를 확인하세요.</p>
+              <div class="heatmap-scroll"><div class="heatmap" id="hero-heatmap"><!-- injected by JS --></div></div>
+              <div class="legend">
+                <span class="legend-item"><span class="legend-dot good"></span>회의하기 좋은 시간</span>
+                <span class="legend-item"><span class="legend-dot caution"></span>가능하지만 추천하지 않음</span>
+                <span class="legend-item"><span class="legend-dot bad"></span>참석 어려움</span>
+                <span class="legend-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F5A623"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>가장 적합한 시간</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="alt-slots-label">다른 추천 시간</p>
+        <div id="alt-slots"><!-- injected by JS --></div>
+      </div>
+    </section>
+
+    <!-- ================= Screen 01 — 나의 회의 프로필 ================= -->
+    <section class="screen" id="screen-profile">
+      <div class="screen-header">
+        <h1>나의 회의 프로필</h1>
+        <p class="screen-subtitle">나의 업무 패턴을 설정하면 이후 회의 추천에 자동으로 반영돼요.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18" stroke="currentColor" stroke-width="1.8"/></svg>
+          업무시간
+        </div>
+        <div class="time-range">
+          <input type="time" value="09:00" class="field" style="max-width:140px;">
+          <span class="time-sep">~</span>
+          <input type="time" value="18:00" class="field" style="max-width:140px;">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12h16M6 12a6 6 0 0012 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          점심시간
+        </div>
+        <div class="time-range">
+          <input type="time" value="12:00" class="field" style="max-width:140px;">
+          <span class="time-sep">~</span>
+          <input type="time" value="13:00" class="field" style="max-width:140px;">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          집중 업무 시간
+        </div>
+        <div class="time-range">
+          <input type="time" value="09:00" class="field" style="max-width:140px;">
+          <span class="time-sep">~</span>
+          <input type="time" value="11:00" class="field" style="max-width:140px;">
+        </div>
+        <p class="card-desc hint">이 시간은 가능한 회의를 추천하지 않아요.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">회의 선호 시간</div>
+        <div class="chip-group" role="radiogroup" aria-label="회의 선호 시간">
+          <div class="chip">
+            <input type="radio" name="pref-time" id="pref-am" value="am">
+            <label for="pref-am">오전</label>
+          </div>
+          <div class="chip">
+            <input type="radio" name="pref-time" id="pref-pm" value="pm" checked>
+            <label for="pref-pm">오후</label>
+          </div>
+          <div class="chip">
+            <input type="radio" name="pref-time" id="pref-any" value="any">
+            <label for="pref-any">언제든 가능</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">가능하면 피해주세요</div>
+        <div class="check-list">
+          <label class="check-item"><input type="checkbox" checked><span>점심 직후</span></label>
+          <label class="check-item"><input type="checkbox" checked><span>퇴근 직전</span></label>
+          <label class="check-item"><input type="checkbox" checked><span>월요일 오전</span></label>
+          <label class="check-item"><input type="checkbox"><span>금요일 오후</span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">반복 일정</div>
+        <p class="card-desc">이 시간에는 회의가 자동으로 제외돼요.</p>
+        <div class="check-list">
+          <label class="check-item repeat-item"><input type="checkbox" checked><span>화요일 외근<span class="meta">10:00 – 17:00</span></span></label>
+          <label class="check-item repeat-item"><input type="checkbox" checked><span>목요일 팀회의<span class="meta">14:00 – 15:00</span></span></label>
+          <label class="check-item repeat-item"><input type="checkbox" checked><span>금요일 교육<span class="meta">09:00 – 12:00</span></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <strong>회의 전후 이동시간 확보</strong>
+            <span>연속된 회의 사이 최소 여유 시간을 확보해요.</span>
+          </div>
+          <div class="toggle-right">
+            <select class="select minute-select" id="buffer-minutes">
+              <option>10분</option>
+              <option selected>15분</option>
+              <option>30분</option>
+            </select>
+            <label class="switch">
+              <input type="checkbox" id="buffer-toggle" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-cta">
+        <button class="btn btn-primary btn-block" id="save-profile-btn">저장하기</button>
+      </div>
+    </section>
+
+    <!-- ================= Screen 03 — 예약 상세 ================= -->
+    <section class="screen" id="screen-detail">
+      <div class="back-row">
+        <button class="icon-btn" id="detail-back-btn" aria-label="뒤로 가기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h1 style="font-size:18px; margin:0;">예약 상세</h1>
+      </div>
+
+      <div class="booking-summary">
+        <p class="booking-summary-label">예약된 시간</p>
+        <div class="booking-summary-time" id="detail-time">오늘 오후 2:00 – 3:00</div>
+        <div class="booking-summary-attendees" id="detail-attendees"><!-- injected by JS --></div>
+      </div>
+
+      <div class="detail-score-row">
+        <div class="score-badge score-badge--md" id="detail-score">96<span class="score-unit">점</span></div>
+        <div class="score-label score-label--great" id="detail-score-label">매우 적합</div>
+      </div>
+      <p class="detail-desc">참석 가능 여부뿐 아니라 업무 맥락까지 함께 고려한 결과예요.</p>
+
+      <div class="card">
+        <div class="card-title">회의 적합도 계산 기준</div>
+        <div class="criteria-list" id="criteria-list"><!-- injected by JS --></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">참석자별 회의 적합도</div>
+        <p class="card-desc">사람 중심으로 구성했어요. 각 셀을 눌러 이유를 확인하세요.</p>
+        <div class="heatmap-scroll">
+          <div class="heatmap" id="heatmap"><!-- injected by JS --></div>
+        </div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot good"></span>회의하기 좋은 시간</span>
+          <span class="legend-item"><span class="legend-dot caution"></span>가능하지만 추천하지 않음</span>
+          <span class="legend-item"><span class="legend-dot bad"></span>참석 어려움</span>
+          <span class="legend-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F5A623"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>가장 적합한 시간</span>
+        </div>
+      </div>
+
+      <div class="sticky-cta detail-actions">
+        <button class="btn btn-ghost btn-block" id="detail-reschedule-btn">일정 변경하기</button>
+        <button class="btn btn-text btn-text-danger btn-block" id="detail-cancel-btn">예약 취소</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ Mobile bottom tab bar ============ -->
+  <nav class="mobile-tabbar">
+    <button class="tab-item active" data-nav="home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9a1 1 0 001 1h10a1 1 0 001-1v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      홈
+    </button>
+    <button class="tab-item" data-nav="create">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/></svg>
+      회의 만들기
+    </button>
+    <button class="tab-item" data-nav="profile">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      내 프로필
+    </button>
+  </nav>
+
+</div>
+
+<!-- Person detail sheet / side panel -->
+<div class="sheet-overlay" id="sheet-overlay">
+  <div class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="sheet-close-btn" aria-label="닫기">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="sheet-header">
+      <div class="avatar" id="sheet-avatar">민</div>
+      <div>
+        <div class="sheet-name" id="sheet-name">민수</div>
+      </div>
+    </div>
+    <div class="sheet-score-row">
+      <div class="sheet-score" id="sheet-score">92</div>
+      <div class="score-label score-label--great" id="sheet-tag">추천</div>
+    </div>
+    <div class="card-title" style="font-size:14px; color:var(--color-text-tertiary); margin-bottom:var(--space-2);">이유</div>
+    <div class="sheet-reasons" id="sheet-reasons"><!-- injected by JS --></div>
+  </div>
+</div>
+
+<!-- Attendee picker sheet -->
+<div class="sheet-overlay" id="picker-overlay">
+  <div class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="picker-close-btn" aria-label="닫기">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="card-title" id="picker-title" style="margin-bottom: var(--space-4);">참석자 추가</div>
+    <div class="search-field">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input type="text" id="picker-search" placeholder="이름으로 검색" autocomplete="off">
+    </div>
+    <div class="check-list" id="picker-list"><!-- injected by JS --></div>
+    <button class="btn btn-primary btn-block" id="picker-confirm-btn" style="margin-top: var(--space-6);">추가하기</button>
+  </div>
+</div>
+
+<!-- Cancel-booking confirmation dialog -->
+<div class="dialog-overlay" id="confirm-dialog-overlay">
+  <div class="dialog-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+    <h3 class="dialog-title" id="confirm-dialog-title">예약을 취소할까요?</h3>
+    <p class="dialog-desc">취소하면 예정된 회의 목록에서 바로 사라져요.</p>
+    <div class="dialog-actions">
+      <button class="btn btn-ghost btn-block" id="confirm-dialog-dismiss">돌아가기</button>
+      <button class="btn btn-danger btn-block" id="confirm-dialog-confirm">예약 취소하기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
