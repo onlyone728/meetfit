@@ -153,7 +153,7 @@ function renderAttendeeList() {
 
   if (state.selectedAttendeeIds.length === 0) {
     list.innerHTML = `
-      <li class="attendee-empty">
+      <li class="list-empty">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <span>아직 추가된 참석자가 없어요</span>
       </li>`;
@@ -171,7 +171,7 @@ function renderAttendeeList() {
             <button type="button" class="seg-btn ${state.attendance[a.id] ? 'active' : ''}" data-value="required">필참</button>
             <button type="button" class="seg-btn ${!state.attendance[a.id] ? 'active' : ''}" data-value="optional">선택 참석</button>
           </div>
-          <button type="button" class="remove-attendee-btn" data-person="${a.id}" aria-label="${a.name} 삭제">
+          <button type="button" class="remove-item-btn" data-person="${a.id}" aria-label="${a.name} 삭제">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -189,7 +189,7 @@ function renderAttendeeList() {
     });
   });
 
-  list.querySelectorAll('.remove-attendee-btn').forEach(btn => {
+  list.querySelectorAll('.remove-item-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selectedAttendeeIds = state.selectedAttendeeIds.filter(id => id !== btn.dataset.person);
       renderAttendeeList();
@@ -433,6 +433,83 @@ function showScreen(name) {
 
 document.querySelectorAll('[data-nav]').forEach(btn => {
   btn.addEventListener('click', () => showScreen(btn.dataset.nav));
+});
+
+// ============================================================================
+// Screen 01 — calendar integration (replaces manual schedule entry)
+// ============================================================================
+let calendarConnected = false;
+
+// Mock data as if imported from the connected Google Calendar.
+const syncedSchedule = {
+  recurring: [
+    { id: 'r1', title: '외근',   weekday: '화', start: '10:00', end: '17:00', enabled: true },
+    { id: 'r2', title: '팀회의', weekday: '목', start: '14:00', end: '15:00', enabled: true },
+    { id: 'r3', title: '교육',   weekday: '금', start: '09:00', end: '12:00', enabled: true },
+  ],
+  oneTime: [
+    { id: 'o1', title: '병원 예약', date: '2026-07-10', start: '14:00', end: '15:00', enabled: true },
+  ],
+};
+
+function renderSyncedSchedule() {
+  const list = document.getElementById('synced-schedule-list');
+  const items = [
+    ...syncedSchedule.recurring.map(s => ({ ...s, kind: 'recurring' })),
+    ...syncedSchedule.oneTime.map(s => ({ ...s, kind: 'onetime' })),
+  ];
+
+  if (items.length === 0) {
+    list.innerHTML = `
+      <li class="list-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span>가져온 일정이 없어요</span>
+      </li>`;
+    return;
+  }
+
+  list.innerHTML = items.map(s => {
+    const label = s.kind === 'recurring' ? `매주 ${s.weekday}요일 ${s.title}` : `${resolveDayLabel(s.date)} ${s.title}`;
+    return `
+    <div class="check-item repeat-item synced-item">
+      <input type="checkbox" id="sync-${s.id}" ${s.enabled ? 'checked' : ''}>
+      <label for="sync-${s.id}">${label}<span class="meta">${s.start} – ${s.end}</span></label>
+      <span class="synced-tag" title="Google 캘린더에서 가져옴">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </span>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = cb.id.replace('sync-', '');
+      const item = syncedSchedule.recurring.find(s => s.id === id) || syncedSchedule.oneTime.find(s => s.id === id);
+      if (item) item.enabled = cb.checked;
+    });
+  });
+}
+
+document.getElementById('connect-calendar-btn').addEventListener('click', () => {
+  document.getElementById('calendar-disconnected-state').style.display = 'none';
+  document.getElementById('calendar-connecting-state').style.display = 'flex';
+
+  setTimeout(() => {
+    calendarConnected = true;
+    document.getElementById('calendar-connecting-state').style.display = 'none';
+    document.getElementById('calendar-connected-state').style.display = 'block';
+    document.getElementById('calendar-sync-time').textContent = '방금 동기화됨';
+    document.getElementById('synced-schedule-card').style.display = 'block';
+    renderSyncedSchedule();
+    showToast('구글 캘린더가 연동됐어요.');
+  }, 900);
+});
+
+document.getElementById('disconnect-calendar-btn').addEventListener('click', () => {
+  calendarConnected = false;
+  document.getElementById('calendar-connected-state').style.display = 'none';
+  document.getElementById('synced-schedule-card').style.display = 'none';
+  document.getElementById('calendar-disconnected-state').style.display = 'block';
+  showToast('캘린더 연동이 해제됐어요.');
 });
 
 // ============================================================================

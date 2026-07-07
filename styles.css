@@ -718,6 +718,13 @@ select.select:focus {
   color: var(--color-text);
 }
 
+.check-item label {
+  font-size: 15px;
+  color: var(--color-text);
+  flex: 1;
+  cursor: pointer;
+}
+
 .check-item .avatar {
   width: 32px;
   height: 32px;
@@ -994,7 +1001,7 @@ select.minute-select {
   flex-shrink: 0;
 }
 
-.remove-attendee-btn {
+.remove-item-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1009,12 +1016,12 @@ select.minute-select {
   transition: background var(--dur-fast), color var(--dur-fast);
 }
 
-.remove-attendee-btn:hover {
+.remove-item-btn:hover {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
 
-.attendee-empty {
+.list-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1025,7 +1032,47 @@ select.minute-select {
   font-size: 14px;
 }
 
-.attendee-empty svg {
+.list-empty svg {
+  color: var(--color-text-disabled);
+}
+
+/* Calendar integration (Screen 01) */
+.calendar-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.calendar-account-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.calendar-avatar {
+  background: #4285F4;
+  color: #fff;
+  font-weight: 700;
+}
+
+.calendar-account-email {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calendar-sync-time {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.synced-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   color: var(--color-text-disabled);
 }
 

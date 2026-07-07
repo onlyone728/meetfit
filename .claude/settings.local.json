@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /Users/wonny/Desktop/toss_UXUI/assets && cp \"/Users/wonny/Downloads/symbol.png\" \"/Users/wonny/Downloads/type.png\" \"/Users/wonny/Downloads/logo.png\" /Users/wonny/Desktop/toss_UXUI/assets/ && ls -la /Users/wonny/Desktop/toss_UXUI/assets/)"
+      "Bash(mkdir -p /Users/wonny/Desktop/toss_UXUI/assets && cp \"/Users/wonny/Downloads/symbol.png\" \"/Users/wonny/Downloads/type.png\" \"/Users/wonny/Downloads/logo.png\" /Users/wonny/Desktop/toss_UXUI/assets/ && ls -la /Users/wonny/Desktop/toss_UXUI/assets/)",
+      "Bash(node --check /Users/wonny/Desktop/meetfit/app.js)",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('/Users/wonny/Desktop/meetfit/app.js','utf8'\\)\\)\")"
     ]
   }
 }
