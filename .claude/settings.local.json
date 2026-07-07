@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /Users/wonny/Desktop/toss_UXUI/assets && cp \"/Users/wonny/Downloads/symbol.png\" \"/Users/wonny/Downloads/type.png\" \"/Users/wonny/Downloads/logo.png\" /Users/wonny/Desktop/toss_UXUI/assets/ && ls -la /Users/wonny/Desktop/toss_UXUI/assets/)"
+      "Bash(mkdir -p /Users/wonny/Desktop/toss_UXUI/assets && cp \"/Users/wonny/Downloads/symbol.png\" \"/Users/wonny/Downloads/type.png\" \"/Users/wonny/Downloads/logo.png\" /Users/wonny/Desktop/toss_UXUI/assets/ && ls -la /Users/wonny/Desktop/toss_UXUI/assets/)",
+      "Bash(node *)",
+      "Skill(run)",
+      "Bash(python3 .claude/nocache_server.py 4173)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4173/index.html)",
+      "Bash(npx --no-install chromium-cli --help)",
+      "Bash(npm ls *)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(npx playwright *)",
+      "Bash(pkill -f nocache_server.py)",
+      "Bash(nohup python3 .claude/nocache_server.py 4173)",
+      "Bash(disown)"
     ]
   }
 }
