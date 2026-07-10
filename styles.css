@@ -134,6 +134,108 @@ select:focus-visible,
 }
 
 /* ==========================================================================
+   Auth — 로그인 / 회원가입
+   ========================================================================== */
+.auth-view {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--color-bg-secondary);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.auth-brand {
+  justify-content: center;
+  padding: 0 0 var(--space-2);
+}
+
+.auth-lede {
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  margin: 0 0 var(--space-6);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.auth-social {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.btn-social {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-social:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-text-disabled);
+}
+
+.btn-social--kakao {
+  background: #FEE500;
+  border-color: #FEE500;
+  color: #191600;
+}
+
+.btn-social--kakao:hover {
+  background: #FADA00;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  margin: var(--space-6) 0 0;
+}
+
+.auth-switch-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: var(--space-6) var(--space-5);
+  }
+}
+
+/* ==========================================================================
    App Shell — inspired by Zoom's icon-sidebar + main content structure
    ========================================================================== */
 .app-shell {
@@ -335,6 +437,62 @@ select:focus-visible,
 /* ==========================================================================
    Screen 00 — Home (meeting list)
    ========================================================================== */
+.setup-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary-light-hover);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+}
+
+.setup-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.setup-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-banner-text strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.setup-banner-text span {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.setup-banner-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .setup-banner {
+    flex-wrap: wrap;
+  }
+
+  .setup-banner-btn {
+    width: 100%;
+  }
+}
+
 .list-section {
   margin-bottom: var(--space-8);
 }
@@ -603,6 +761,7 @@ select:focus-visible,
 
 input[type="time"],
 input[type="date"],
+input.select,
 select.select {
   width: 100%;
   padding: var(--space-3) var(--space-4);
@@ -617,6 +776,7 @@ select.select {
 
 input[type="time"]:focus,
 input[type="date"]:focus,
+input.select:focus,
 select.select:focus {
   border-color: var(--color-primary);
   background: var(--color-surface);
@@ -716,6 +876,13 @@ select.select:focus {
 .check-item span {
   font-size: 15px;
   color: var(--color-text);
+}
+
+.check-item label {
+  font-size: 15px;
+  color: var(--color-text);
+  flex: 1;
+  cursor: pointer;
 }
 
 .check-item .avatar {
@@ -994,7 +1161,7 @@ select.minute-select {
   flex-shrink: 0;
 }
 
-.remove-attendee-btn {
+.remove-item-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1009,12 +1176,12 @@ select.minute-select {
   transition: background var(--dur-fast), color var(--dur-fast);
 }
 
-.remove-attendee-btn:hover {
+.remove-item-btn:hover {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
 
-.attendee-empty {
+.list-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1025,7 +1192,47 @@ select.minute-select {
   font-size: 14px;
 }
 
-.attendee-empty svg {
+.list-empty svg {
+  color: var(--color-text-disabled);
+}
+
+/* Calendar integration (Screen 01) */
+.calendar-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.calendar-account-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.calendar-avatar {
+  background: #4285F4;
+  color: #fff;
+  font-weight: 700;
+}
+
+.calendar-account-email {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calendar-sync-time {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.synced-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   color: var(--color-text-disabled);
 }
 
