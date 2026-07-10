@@ -536,12 +536,21 @@ select:focus-visible,
 }
 
 .meeting-item.pending {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary-light-hover);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
 }
 
 .meeting-item.pending:hover {
-  border-color: var(--color-primary);
+  border-color: var(--color-text-disabled);
+}
+
+.meeting-item.incoming {
+  background: var(--color-warning-bg);
+  border-color: #F6D9AE;
+}
+
+.meeting-item.incoming:hover {
+  border-color: var(--color-warning);
 }
 
 .meeting-item-left {
@@ -1186,11 +1195,10 @@ select.minute-select {
   flex-shrink: 0;
 }
 
-<<<<<<< HEAD
-.remove-item-btn {
-=======
+/* 데스크톱/태블릿(가로 폭 여유)에서는 필참/선택참석 토글 버튼, 모바일에서는
+   체크박스 하나로 — 아래 @media (max-width: 900px)에서 뒤집는다. */
 .required-check {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
   font-size: 13px;
@@ -1209,7 +1217,6 @@ select.minute-select {
 }
 
 .remove-attendee-btn {
->>>>>>> feature/recommendation
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1224,7 +1231,7 @@ select.minute-select {
   transition: background var(--dur-fast), color var(--dur-fast);
 }
 
-.remove-item-btn:hover {
+.remove-attendee-btn:hover {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
@@ -2519,6 +2526,11 @@ select.minute-select {
   color: var(--color-danger-text);
 }
 
+.status-chip--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
 /* ==========================================================================
    Screen 04 — MeetFit 합의 결과
    ========================================================================== */
@@ -2786,7 +2798,8 @@ select.minute-select {
     box-shadow: var(--shadow-lg);
   }
 
-  .meeting-item.pending:hover {
+  .meeting-item.pending:hover,
+  .meeting-item.incoming:hover {
     box-shadow: var(--shadow-sm);
   }
 }
@@ -2825,6 +2838,15 @@ select.minute-select {
 
   .score-badge--xl {
     font-size: 44px;
+  }
+
+  /* 참석자 행 — 모바일에서는 체크박스, 데스크톱/태블릿에서는 토글 버튼 */
+  .required-toggle {
+    display: none;
+  }
+
+  .required-check {
+    display: inline-flex;
   }
 
   /* 홈 화면 "새 회의 예약하기" — 모바일에서는 우하단 플로팅 버튼(FAB)으로 전환 */

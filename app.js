@@ -351,8 +351,8 @@ const SLOTS = [
 ];
 
 const PAST_MEETINGS = [
-  { dateLabel: '어제 오후 3:00 – 4:00', attendeeIds: ['minsu', 'younghee', 'chulsoo'] },
-  { dateLabel: '7월 3일 오전 11:00 – 12:00', attendeeIds: ['jieun', 'suhyun', 'daeun', 'minsu'] },
+  { title: '신규 기능 디자인 리뷰', dateLabel: '어제 오후 3:00 – 4:00', attendeeIds: ['minsu', 'younghee', 'chulsoo'] },
+  { title: '7월 마케팅 캠페인 킥오프', dateLabel: '7월 3일 오전 11:00 – 12:00', attendeeIds: ['jieun', 'suhyun', 'daeun', 'minsu'] },
 ];
 
 // 홈 화면 "나에게 온 제안" 더미 데이터 — 다른 사람이 나를 필참자로 초대했다고 가정한
@@ -463,12 +463,9 @@ const state = {
   consensusResult: [],       // computeConsensus() 결과 — 회의 확정 시 참고
   activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
-<<<<<<< HEAD
   profileSaved: false,       // 나의 회의 프로필에서 "저장하기"를 눌렀는지
-=======
   pendingMeetings: [],       // 필참자에게 제안했지만 아직 확정되지 않은 회의 (홈 화면에 노출)
   activePendingId: null,     // 지금 의견수집/합의 화면에서 다루고 있는 pendingMeetings 항목의 id
->>>>>>> feature/recommendation
 };
 
 // ============================================================================
@@ -576,19 +573,15 @@ function renderAttendeeList() {
           </span>
         </div>
         <div class="attendee-row-actions">
-<<<<<<< HEAD
-          <div class="segmented" role="group" aria-label="${a.name} 참석 유형" data-person="${a.id}">
+          <div class="segmented required-toggle" role="group" aria-label="${a.name} 참석 유형" data-person="${a.id}">
             <button type="button" class="seg-btn ${state.attendance[a.id] ? 'active' : ''}" data-value="required">필참</button>
             <button type="button" class="seg-btn ${!state.attendance[a.id] ? 'active' : ''}" data-value="optional">선택 참석</button>
           </div>
-          <button type="button" class="remove-item-btn" data-person="${a.id}" aria-label="${a.name} 삭제">
-=======
           <label class="required-check" for="required-${a.id}">
             <input type="checkbox" class="required-checkbox" data-person="${a.id}" id="required-${a.id}" ${state.attendance[a.id] ? 'checked' : ''}>
             <span>필참</span>
           </label>
           <button type="button" class="remove-attendee-btn" data-person="${a.id}" aria-label="${a.name} 삭제">
->>>>>>> feature/recommendation
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -596,13 +589,29 @@ function renderAttendeeList() {
     }).join('');
   }
 
-  list.querySelectorAll('.required-checkbox').forEach(box => {
-    box.addEventListener('change', () => {
-      state.attendance[box.dataset.person] = box.checked;
+  list.querySelectorAll('.required-toggle').forEach(seg => {
+    seg.addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      const personId = seg.dataset.person;
+      state.attendance[personId] = btn.dataset.value === 'required';
+      seg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+      const checkbox = list.querySelector(`.required-checkbox[data-person="${personId}"]`);
+      if (checkbox) checkbox.checked = state.attendance[personId];
     });
   });
 
-  list.querySelectorAll('.remove-item-btn').forEach(btn => {
+  list.querySelectorAll('.required-checkbox').forEach(box => {
+    box.addEventListener('change', () => {
+      state.attendance[box.dataset.person] = box.checked;
+      const seg = list.querySelector(`.required-toggle[data-person="${box.dataset.person}"]`);
+      if (seg) {
+        seg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.value === (box.checked ? 'required' : 'optional')));
+      }
+    });
+  });
+
+  list.querySelectorAll('.remove-attendee-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selectedAttendeeIds = state.selectedAttendeeIds.filter(id => id !== btn.dataset.person);
       renderAttendeeList();
@@ -1477,7 +1486,7 @@ function renderDetail(booking) {
 function renderOptionalList(booking) {
   const wrap = document.getElementById('detail-optional-list');
   if (booking.optionalIds.length === 0) {
-    wrap.innerHTML = `<li class="attendee-empty">선택 참석자가 없어요</li>`;
+    wrap.innerHTML = `<li class="list-empty">선택 참석자가 없어요</li>`;
     document.getElementById('detail-optional-summary').textContent = '';
     return;
   }
@@ -1772,14 +1781,14 @@ function renderIncomingList() {
 
   section.style.display = 'block';
   wrap.innerHTML = `
-    <div class="meeting-item pending" id="incoming-invite-item">
+    <div class="meeting-item incoming" id="incoming-invite-item">
       <div class="meeting-item-left">
         <span class="meeting-item-time">${INCOMING_INVITE.title}</span>
         <span class="meeting-item-count">${organizer.name}님의 제안 · ${INCOMING_INVITE.candidateLabels[0]}${otherCount > 0 ? ` 외 ${otherCount}건` : ''}</span>
         <div class="meeting-item-attendees">${avatarStackHtml(INCOMING_INVITE.participantIds)}</div>
       </div>
       <div class="meeting-item-right">
-        <span class="status-chip status-chip--pending">응답 필요</span>
+        <span class="status-chip status-chip--warning">응답 필요</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </div>`;
@@ -1826,12 +1835,9 @@ function renderPendingList() {
 }
 
 function renderHome() {
-<<<<<<< HEAD
   updateSetupBanner();
-=======
   renderIncomingList();
   renderPendingList();
->>>>>>> feature/recommendation
   const upcomingWrap = document.getElementById('upcoming-list');
   if (state.bookings.length === 0) {
     upcomingWrap.innerHTML = `
@@ -1874,7 +1880,8 @@ function renderHome() {
   pastWrap.innerHTML = PAST_MEETINGS.map((m, i) => `
     <div class="meeting-item past" style="animation-delay:${i * 45}ms">
       <div class="meeting-item-left">
-        <span class="meeting-item-time">${m.dateLabel}</span>
+        <span class="meeting-item-time">${m.title}</span>
+        <span class="meeting-item-count">${m.dateLabel}</span>
         <div class="meeting-item-attendees">${avatarStackHtml(m.attendeeIds)}</div>
       </div>
       <div class="meeting-item-right">
