@@ -578,6 +578,12 @@ select:focus-visible,
   gap: var(--space-2);
 }
 
+.required-mark {
+  color: var(--color-danger);
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .card-desc {
   font-size: 14px;
   color: var(--color-text-tertiary);
@@ -612,6 +618,7 @@ select:focus-visible,
 
 input[type="time"],
 input[type="date"],
+input.select,
 select.select {
   width: 100%;
   padding: var(--space-3) var(--space-4);
@@ -626,6 +633,7 @@ select.select {
 
 input[type="time"]:focus,
 input[type="date"]:focus,
+input.select:focus,
 select.select:focus {
   border-color: var(--color-primary);
   background: var(--color-surface);
@@ -780,6 +788,16 @@ select.select:focus {
 
 .picker-empty svg {
   color: var(--color-text-disabled);
+}
+
+.picker-select-all {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.picker-select-all span {
+  font-weight: 700;
 }
 
 .check-item.repeat-item span.meta {
@@ -1003,6 +1021,25 @@ select.minute-select {
   flex-shrink: 0;
 }
 
+.required-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.required-check input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
 .remove-attendee-btn {
   width: 32px;
   height: 32px;
@@ -1166,6 +1203,13 @@ select.minute-select {
   padding: var(--space-8);
   box-shadow: var(--shadow-md);
   margin-bottom: var(--space-6);
+}
+
+.hero-meeting-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
 }
 
 .hero-eyebrow {
@@ -1409,6 +1453,13 @@ select.minute-select {
    ========================================================================== */
 .booking-summary {
   padding: var(--space-6) 0 var(--space-5);
+}
+
+.booking-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-3);
 }
 
 .booking-summary-label {
@@ -1791,6 +1842,46 @@ select.minute-select {
   color: var(--color-text-tertiary);
 }
 
+/* 응답 시트 상단 — 필참자가 무엇에 응답하는지 먼저 보여주는 컨텍스트 블록 */
+.respond-context {
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+}
+
+.respond-context-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+}
+
+.respond-context-attendees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.respond-attendee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.respond-attendee-chip .avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
 @media (min-width: 1024px) {
   .sheet-overlay {
     align-items: stretch;
@@ -1814,6 +1905,43 @@ select.minute-select {
   .sheet-handle {
     display: none;
   }
+}
+
+/* 제안 응답 모달 — 다른 시트들과 달리 화면 크기와 무관하게 항상 중앙 모달로 뜬다 */
+.respond-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-4);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.respond-modal-overlay.open {
+  display: flex;
+  opacity: 1;
+}
+
+.respond-modal {
+  position: relative;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 480px;
+  max-height: 85dvh;
+  overflow-y: auto;
+  padding: var(--space-6);
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.96) translateY(8px);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.respond-modal-overlay.open .respond-modal {
+  transform: scale(1) translateY(0);
 }
 
 /* Confirmation dialog (destructive actions) */
@@ -2329,6 +2457,132 @@ select.minute-select {
 }
 
 /* ==========================================================================
+   Micro-interactions — 리스트 진입, 배지 등장, 선택 피드백, 눌림 반응
+   ========================================================================== */
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.meeting-item {
+  animation: itemIn var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0.4) rotate(-8deg);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.15) rotate(3deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+.rank-badge {
+  display: inline-block;
+  animation: badgePop 420ms var(--ease-out);
+}
+
+@keyframes chipPulse {
+  0% {
+    transform: scale(0.96);
+  }
+
+  55% {
+    transform: scale(1.03);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.purpose-chip input:checked+label {
+  animation: chipPulse 260ms var(--ease-out);
+}
+
+.seg-btn,
+.chip label,
+.icon-btn,
+.tab-item {
+  transition-property: transform, background, color, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+.seg-btn:active,
+.chip label:active,
+.icon-btn:active,
+.tab-item:active {
+  transform: scale(0.92);
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 60%;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-primary);
+  transform: translateY(-50%) scaleY(0);
+  transform-origin: center;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.nav-item.active::before {
+  transform: translateY(-50%) scaleY(1);
+}
+
+.nav-item:active {
+  transform: scale(0.98);
+}
+
+@keyframes toastCheckIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.toast svg {
+  animation: toastCheckIn 320ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  #new-meeting-btn:hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .meeting-item.pending:hover {
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 @media (max-width: 900px) {
@@ -2362,6 +2616,23 @@ select.minute-select {
 
   .score-badge--xl {
     font-size: 44px;
+  }
+
+  /* 홈 화면 "새 회의 예약하기" — 모바일에서는 우하단 플로팅 버튼(FAB)으로 전환 */
+  #new-meeting-btn {
+    position: fixed;
+    right: var(--space-5);
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    z-index: 45;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: var(--shadow-lg);
+  }
+
+  #new-meeting-btn .btn-label {
+    display: none;
   }
 }
 

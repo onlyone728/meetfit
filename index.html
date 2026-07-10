@@ -44,7 +44,7 @@
   <div class="topbar">
     <div class="brand" style="padding:0;">
       <img src="assets/symbol.png" alt="" class="brand-symbol" style="width:24px;height:24px;">
-      <img src="assets/type.png" alt="meetfit" class="brand-type" style="height:14px;">
+      <img src="assets/type.png" alt="meetfit" class="brand-type" style="height:30px;">
     </div>
   </div>
 
@@ -59,8 +59,14 @@
         </div>
         <button class="btn btn-primary" id="new-meeting-btn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-          새 회의 예약하기
+          <span class="btn-label">새 회의 예약하기</span>
         </button>
+      </div>
+
+      <div class="list-section" id="incoming-section" style="display:none;">
+        <h2 class="list-section-title">나에게 온 제안</h2>
+        <p class="card-desc" style="margin:0 0 var(--space-3);">다른 사람이 나를 필참자로 제안한 회의예요. 응답해주세요.</p>
+        <div id="incoming-list"><!-- injected by JS --></div>
       </div>
 
       <div class="list-section" id="pending-section" style="display:none;">
@@ -99,6 +105,12 @@
 
       <!-- Step A: form -->
       <div id="meeting-form">
+        <div class="card">
+          <div class="card-title">회의 제목 <span class="required-mark">*</span></div>
+          <p class="card-desc">필참자에게 어떤 회의인지 바로 보여줘요.</p>
+          <input type="text" class="select" id="meeting-title-input" placeholder="예: 주간 마케팅 싱크" maxlength="60" autocomplete="off" required aria-required="true">
+        </div>
+
         <div class="card">
           <div class="card-title">회의 목적</div>
           <p class="card-desc">목적에 따라 추천 기준이 자동으로 바뀌어요.</p>
@@ -200,6 +212,7 @@
         </div>
 
         <div class="hero-card">
+          <p class="hero-meeting-title" id="hero-meeting-title" style="display:none;"></p>
           <p class="hero-eyebrow">
             <span class="rank-badge rank-badge--lg">🥇</span> 가장 추천
           </p>
@@ -492,6 +505,7 @@
       </div>
 
       <div class="booking-summary">
+        <h2 class="booking-title" id="detail-meeting-title" style="display:none;"></h2>
         <p class="booking-summary-label">확정된 시간</p>
         <div class="booking-summary-time" id="detail-time">오늘 오후 2:00 – 3:00</div>
         <span class="purpose-tag" id="detail-purpose-chip"></span>
@@ -618,19 +632,28 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <input type="text" id="picker-search" placeholder="이름 또는 팀으로 검색" autocomplete="off">
     </div>
+    <label class="check-item picker-select-all">
+      <input type="checkbox" id="picker-select-all-checkbox">
+      <span>전체 선택</span>
+    </label>
     <div class="check-list" id="picker-list"><!-- injected by JS --></div>
     <button class="btn btn-primary btn-block" id="picker-confirm-btn" style="margin-top: var(--space-6);">추가하기</button>
   </div>
 </div>
 
 <!-- 필참자 응답 시뮬레이션 시트 (데모: 조직자가 특정 필참자 입장에서 응답) -->
-<div class="sheet-overlay" id="respond-sheet-overlay">
-  <div class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="respond-sheet-title">
-    <div class="sheet-handle"></div>
+<div class="respond-modal-overlay" id="respond-sheet-overlay">
+  <div class="respond-modal" role="dialog" aria-modal="true" aria-labelledby="respond-sheet-title">
     <button class="icon-btn sheet-close" id="respond-sheet-close-btn" aria-label="닫기">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
     <div class="card-title" id="respond-sheet-title" style="margin-bottom: var(--space-2);">응답하기</div>
+
+    <div class="respond-context">
+      <p class="respond-context-title" id="respond-meeting-title"></p>
+      <div class="respond-context-attendees" id="respond-meeting-attendees"><!-- injected by JS --></div>
+    </div>
+
     <p class="card-desc">가능한 시간을 모두 선택해주세요. 복수 선택 가능해요.</p>
     <div class="check-list" id="respond-sheet-options"><!-- injected by JS --></div>
     <label class="check-item">
