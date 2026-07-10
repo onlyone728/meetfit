@@ -113,6 +113,7 @@ const state = {
   meetingDate: '',           // ISO date (YYYY-MM-DD) currently selected on Screen 02
   activeBooking: null,       // the booking currently shown on Screen 03
   bookings: [],              // confirmed upcoming meetings
+  profileSaved: false,       // 나의 회의 프로필에서 "저장하기"를 눌렀는지
 };
 
 // ============================================================================
@@ -501,6 +502,7 @@ document.getElementById('connect-calendar-btn').addEventListener('click', () => 
     document.getElementById('synced-schedule-card').style.display = 'block';
     renderSyncedSchedule();
     showToast('구글 캘린더가 연동됐어요.');
+    updateSetupBanner();
   }, 900);
 });
 
@@ -510,13 +512,28 @@ document.getElementById('disconnect-calendar-btn').addEventListener('click', () 
   document.getElementById('synced-schedule-card').style.display = 'none';
   document.getElementById('calendar-disconnected-state').style.display = 'block';
   showToast('캘린더 연동이 해제됐어요.');
+  updateSetupBanner();
 });
 
 // ============================================================================
 // Screen 01 — profile save
 // ============================================================================
 document.getElementById('save-profile-btn').addEventListener('click', () => {
+  state.profileSaved = true;
   showToast('저장했어요. 이후 회의 추천에 자동으로 반영돼요.');
+  updateSetupBanner();
+});
+
+// ============================================================================
+// Screen 00 — 설정 안내 배너. 캘린더 연동/프로필 저장을 아직 안 한 유저에게만 보여준다.
+// ============================================================================
+function updateSetupBanner() {
+  const banner = document.getElementById('home-setup-banner');
+  banner.style.display = (!calendarConnected || !state.profileSaved) ? 'flex' : 'none';
+}
+
+document.getElementById('home-setup-banner-btn').addEventListener('click', () => {
+  showScreen('profile');
 });
 
 // ============================================================================
@@ -738,6 +755,7 @@ function avatarStackHtml(ids) {
 }
 
 function renderHome() {
+  updateSetupBanner();
   const upcomingWrap = document.getElementById('upcoming-list');
   if (state.bookings.length === 0) {
     upcomingWrap.innerHTML = `
@@ -789,6 +807,60 @@ function renderHome() {
     </div>
   `).join('');
 }
+
+// ============================================================================
+// Auth — 로그인 / 회원가입 (프로토타입: 실제 인증 서버 없이 화면만 전환)
+// ============================================================================
+function setAuthTab(tab) {
+  document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+
+  const switchText = document.getElementById('auth-switch-text');
+  switchText.innerHTML = tab === 'login'
+    ? '계정이 없으신가요? <button type="button" class="auth-switch-link" id="auth-switch-btn">회원가입</button>'
+    : '이미 계정이 있으신가요? <button type="button" class="auth-switch-link" id="auth-switch-btn">로그인</button>';
+  document.getElementById('auth-switch-btn').addEventListener('click', () => setAuthTab(tab === 'login' ? 'signup' : 'login'));
+}
+
+document.getElementById('auth-switch-btn').addEventListener('click', () => setAuthTab('signup'));
+
+function completeLogin({ name, email } = {}) {
+  document.getElementById('auth-view').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'flex';
+
+  const displayName = name || (email ? email.split('@')[0] : '나');
+  document.querySelector('.user-name').textContent = displayName;
+  if (email) document.querySelector('.user-email').textContent = email;
+  document.querySelector('.user-avatar').textContent = displayName[0].toUpperCase();
+
+  showToast('로그인됐어요.');
+}
+
+document.getElementById('login-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  completeLogin({ email: document.getElementById('login-email').value.trim() });
+});
+
+document.getElementById('signup-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const password = document.getElementById('signup-password').value;
+  const passwordConfirm = document.getElementById('signup-password-confirm').value;
+  if (password !== passwordConfirm) {
+    showToast('비밀번호가 일치하지 않아요.');
+    return;
+  }
+  completeLogin({
+    name: document.getElementById('signup-name').value.trim(),
+    email: document.getElementById('signup-email').value.trim(),
+  });
+});
+
+document.getElementById('google-login-btn').addEventListener('click', () => {
+  completeLogin({ name: 'Google 사용자', email: 'you@gmail.com' });
+});
+document.getElementById('kakao-login-btn').addEventListener('click', () => {
+  completeLogin({ name: '카카오 사용자', email: 'kakao_user@kakao.com' });
+});
 
 // ============================================================================
 // Init
