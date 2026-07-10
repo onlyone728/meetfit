@@ -450,6 +450,8 @@ const state = {
   consensusResult: [],       // computeConsensus() 결과 — 회의 확정 시 참고
   activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
+  pendingMeetings: [],       // 필참자에게 제안했지만 아직 확정되지 않은 회의 (홈 화면에 노출)
+  activePendingId: null,     // 지금 의견수집/합의 화면에서 다루고 있는 pendingMeetings 항목의 id
 };
 
 // ============================================================================
@@ -787,7 +789,7 @@ document.getElementById('edit-attendees-btn').addEventListener('click', () => {
 });
 
 // "필참자에게 제안하기" — 추천은 여기서 확정되지 않는다. 필참자 응답을 모으는
-// 단계로 넘어갈 뿐이다.
+// 단계로 넘어갈 뿐이다. 이 시점부터 홈 화면의 "제안 중인 회의"에도 노출된다.
 document.getElementById('propose-btn').addEventListener('click', () => {
   state.requiredIds = state.selectedAttendeeIds.filter(id => state.attendance[id]);
   state.optionalIds = state.selectedAttendeeIds.filter(id => !state.attendance[id]);
@@ -797,10 +799,39 @@ document.getElementById('propose-btn').addEventListener('click', () => {
   }
   state.responses = {};
   state.currentRecommendations.forEach(slot => { state.responses[slot.id] = {}; });
+
+  const pendingEntry = {
+    id: Date.now(),
+    purposeId: state.purpose,
+    requiredIds: [...state.requiredIds],
+    optionalIds: [...state.optionalIds],
+    candidates: state.currentRecommendations,
+    candidateLabels: state.currentRecommendations.map(slot => buildSlotLabel(slot)), // 홈 목록용 — 이후 날짜 필터가 바뀌어도 제안 당시 시간으로 고정
+    responses: state.responses, // 같은 객체를 참조 — 응답이 쌓일 때마다 자동으로 동기화된다
+  };
+  state.pendingMeetings.push(pendingEntry);
+  state.activePendingId = pendingEntry.id;
+  renderHome();
+
   renderCollectScreen();
   setStepper('collect', 'collect');
   showScreen('collect');
 });
+
+// 홈 화면 "제안 중인 회의" 목록에서 항목을 눌렀을 때 — 그 회의의 의견 수집 화면으로 돌아간다.
+function resumePendingMeeting(id) {
+  const entry = state.pendingMeetings.find(p => p.id === id);
+  if (!entry) return;
+  state.activePendingId = entry.id;
+  state.purpose = entry.purposeId;
+  state.requiredIds = entry.requiredIds;
+  state.optionalIds = entry.optionalIds;
+  state.currentRecommendations = entry.candidates;
+  state.responses = entry.responses;
+  renderCollectScreen();
+  setStepper('collect', 'collect');
+  showScreen('collect');
+}
 
 // Reset the creation flow to a blank slate — used whenever the user starts a brand-new meeting.
 function setMeetingDate(dateStr) {
@@ -896,6 +927,7 @@ function resetCreateFlow() {
   state.requiredIds = [];
   state.optionalIds = [];
   state.responses = {};
+  state.activePendingId = null;
   setMeetingDate(toISODate(new Date()));
   setSearchMode('period');
   document.getElementById('period-quick-thisweek').checked = true;
@@ -1425,6 +1457,7 @@ function confirmBooking(slot) {
   };
 
   state.bookings.push(booking);
+  state.pendingMeetings = state.pendingMeetings.filter(p => p.id !== state.activePendingId);
   showToast(`${label} 회의가 확정됐어요.`);
   resetCreateFlow();
   renderHome();
@@ -1503,7 +1536,44 @@ function avatarStackHtml(ids) {
     <span class="meeting-item-count">${ids.length}명</span>`;
 }
 
+// 필참자에게 제안했지만 아직 확정되지 않은 회의 — 응답 진행 상황과 함께 보여주고,
+// 누르면 의견 수집 화면으로 돌아가 이어서 진행할 수 있다.
+function renderPendingList() {
+  const section = document.getElementById('pending-section');
+  const wrap = document.getElementById('pending-list');
+
+  if (state.pendingMeetings.length === 0) {
+    section.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+
+  section.style.display = 'block';
+  wrap.innerHTML = state.pendingMeetings.slice().reverse().map(p => {
+    const respondedCount = p.requiredIds.filter(id =>
+      p.candidates.some(slot => p.responses[slot.id] && p.responses[slot.id][id] !== undefined)
+    ).length;
+    const otherCount = p.candidateLabels.length - 1;
+    return `
+      <div class="meeting-item pending" data-pending="${p.id}">
+        <div class="meeting-item-left">
+          <span class="meeting-item-time">${p.candidateLabels[0]}${otherCount > 0 ? ` 외 ${otherCount}건` : ''}</span>
+          <div class="meeting-item-attendees">${avatarStackHtml(p.requiredIds)}</div>
+        </div>
+        <div class="meeting-item-right">
+          <span class="status-chip status-chip--pending">응답 ${respondedCount}/${p.requiredIds.length}</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.meeting-item.pending').forEach(item => {
+    item.addEventListener('click', () => resumePendingMeeting(Number(item.dataset.pending)));
+  });
+}
+
 function renderHome() {
+  renderPendingList();
   const upcomingWrap = document.getElementById('upcoming-list');
   if (state.bookings.length === 0) {
     upcomingWrap.innerHTML = `
