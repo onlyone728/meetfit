@@ -1058,6 +1058,25 @@ select.minute-select {
   font-weight: 600;
 }
 
+.attendee-info-text,
+.check-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.check-item .team-tag {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
 .segmented {
   display: inline-flex;
   background: var(--color-bg-secondary);
@@ -1337,6 +1356,12 @@ select.minute-select {
 }
 
 .alt-card-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.alt-card-left>div {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1721,6 +1746,12 @@ select.minute-select {
   font-weight: 700;
 }
 
+.sheet-team {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
 .sheet-score-row {
   display: flex;
   align-items: center;
@@ -1917,6 +1948,375 @@ select.minute-select {
 
 .tab-item.active {
   color: var(--color-primary);
+}
+
+/* ==========================================================================
+   회의 목적 선택 (Screen 02)
+   ========================================================================== */
+.purpose-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.purpose-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.purpose-chip label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.purpose-chip input:checked+label {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.purpose-chip input:focus-visible+label {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.purpose-chip-icon {
+  color: var(--color-text-tertiary);
+}
+
+.purpose-chip input:checked+label .purpose-chip-icon {
+  color: var(--color-primary);
+}
+
+.purpose-chip-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.purpose-chip-desc {
+  display: none;
+  font-size: 12px;
+  color: var(--color-primary);
+  line-height: 1.4;
+}
+
+.purpose-chip input:checked+label .purpose-chip-desc {
+  display: block;
+}
+
+/* ==========================================================================
+   순위 배지 + 추천/제외 이유 — 점수보다 앞세우는 1차 정보
+   ========================================================================== */
+.rank-badge {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.rank-badge--lg {
+  font-size: 26px;
+}
+
+.reason-list {
+  list-style: none;
+  margin: var(--space-3) 0 var(--space-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reason-item {
+  position: relative;
+  padding-left: 20px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.reason-item::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.reason-list.muted .reason-item::before {
+  content: "·";
+  color: var(--color-text-tertiary);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Screen 03 — 필참자 의견 수집
+   ========================================================================== */
+.mini-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mini-candidate-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mini-candidate-medal {
+  font-size: 18px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.progress-count {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.responder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  list-style: none;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+
+.responder-row+.responder-row {
+  margin-top: var(--space-2);
+}
+
+.responder-row:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-sunken);
+}
+
+.responder-row.responded {
+  cursor: default;
+}
+
+.responder-summary {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.status-chip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-chip--pending {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-tertiary);
+}
+
+.status-chip--done {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.status-chip--declined {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+/* ==========================================================================
+   Screen 04 — MeetFit 합의 결과
+   ========================================================================== */
+.consensus-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-2);
+}
+
+.consensus-card.top {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.consensus-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.consensus-card-time {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.consensus-card-status {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.exclusion-item {
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.exclusion-item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.exclusion-question {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Screen 05 — 선택 참석자 알림 시트
+   ========================================================================== */
+.optin-sheet-time {
+  margin-bottom: var(--space-6);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.optin-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ==========================================================================
+   Screen 06 — 회의 확정 배지 / 목적 태그 / 참석자 역할 / 생성 히스토리
+   ========================================================================== */
+.confirmed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.purpose-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendee-role-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+
+.attendee-role-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.history-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 32px;
+  bottom: -8px;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.history-step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-success);
+  color: #fff;
+  z-index: 1;
+}
+
+.history-step-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 /* ==========================================================================

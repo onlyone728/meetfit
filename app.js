@@ -2,20 +2,61 @@
 // Data
 // ============================================================================
 const ATTENDEES = [
-  { id: 'minsu', name: '민수' },
-  { id: 'younghee', name: '영희' },
-  { id: 'chulsoo', name: '철수' },
-  { id: 'jieun', name: '지은' },
-  { id: 'suhyun', name: '수현' },
-  { id: 'daeun', name: '다은' },
+  { id: 'minsu', name: '민수', team: '기획팀' },
+  { id: 'younghee', name: '영희', team: '디자인팀' },
+  { id: 'chulsoo', name: '철수', team: '개발팀' },
+  { id: 'jieun', name: '지은', team: '마케팅팀' },
+  { id: 'suhyun', name: '수현', team: '영업팀' },
+  { id: 'daeun', name: '다은', team: '개발팀' },
+];
+
+// ============================================================================
+// 회의 목적 — 목적마다 추천 기준(가중치)이 달라진다. AI는 이 기준을 뒤에서 바꿀 뿐,
+// 화면에는 "왜 이 시간인지" 이유로만 드러난다.
+// ============================================================================
+const MEETING_PURPOSES = [
+  {
+    id: 'share', label: '정보 공유', emphasis: '업무 효율',
+    desc: '참석자의 업무 흐름 방해를 최소화하는 시간을 우선해요.',
+    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    multiplier: { workContext: 1.5, fatigue: 1.6, requiredAttendees: 0.8 },
+  },
+  {
+    id: 'gather', label: '의견 수렴', emphasis: '폭넓은 참여',
+    desc: '가능한 많은 인원이 편하게 참여할 수 있는 시간을 우선해요.',
+    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 18v-1a4 4 0 014-4h2a4 4 0 014 4v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M15 6.5c1.4.3 2.5 1.5 2.5 3s-1.1 2.7-2.5 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    multiplier: { attendanceRate: 1.5, preference: 1.4, requiredAttendees: 0.9 },
+  },
+  {
+    id: 'decide', label: '의사결정', emphasis: '필참 참석률',
+    desc: '의사결정에 필요한 필참자 전원의 참석을 최우선해요.',
+    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 12.5l2.2 2.2L15.5 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    multiplier: { requiredAttendees: 1.8, attendanceRate: 1.2, preference: 0.7 },
+  },
+  {
+    id: 'solve', label: '문제 해결', emphasis: '집중 가능한 여건',
+    desc: '필참자가 몰입해서 논의할 수 있는 여건을 우선해요.',
+    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9.5 15.5L5 20M14.2 9.8a3.5 3.5 0 01-4.6 4.6L7 12l2.5-2.5 4.7.3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 4l1.5 1.5L17 4l1.5 1.5L17 7l1.5 1.5L17 10l-1.5-1.5L14 10l-1.5-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    multiplier: { requiredAttendees: 1.4, workContext: 1.3, fatigue: 1.2 },
+  },
+  {
+    id: 'urgent', label: '긴급 대응', emphasis: '가장 빠른 소집',
+    desc: '점수보다 가장 빨리 모일 수 있는 시간을 우선해요.',
+    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 3L5 14h5l-1 7 8-11h-5l1-7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    multiplier: { requiredAttendees: 1.2 },
+    sortBySoonest: true,
+  },
 ];
 
 // ============================================================================
 // Meeting suitability scoring engine
 //
 // The 100-point score is a sum of independently-computed factors. Each
-// getXScore() takes plain inputs and returns points on its own scale, so any
-// one factor can be re-tuned or unit-tested without touching the others.
+// getXScore() takes plain inputs + a weight table and returns points on its
+// own scale, so any one factor can be re-tuned or unit-tested without
+// touching the others. The weight table itself varies by meeting purpose
+// (see MEETING_PURPOSES/getPurposeWeights) so the same slot can score
+// differently depending on why the meeting is being held.
 // Presentation (label/description) is deliberately kept out of these
 // functions — see getMeetingSummary() below — so the score math stays
 // reusable even if the copy changes.
@@ -29,50 +70,69 @@ const SCORE_WEIGHTS = {
   travelBuffer: 5,
 };
 
-function getRequiredScore(required, available) {
+// 목적별 가중치 = 기본 가중치 * multiplier, 합이 100이 되도록 정규화.
+function getPurposeWeights(purposeId) {
+  const purpose = MEETING_PURPOSES.find(p => p.id === purposeId) || MEETING_PURPOSES[0];
+  const raw = {};
+  let sum = 0;
+  Object.keys(SCORE_WEIGHTS).forEach(key => {
+    const mult = (purpose.multiplier && purpose.multiplier[key]) || 1;
+    raw[key] = SCORE_WEIGHTS[key] * mult;
+    sum += raw[key];
+  });
+  const scale = 100 / sum;
+  const weights = {};
+  Object.keys(raw).forEach(key => { weights[key] = raw[key] * scale; });
+  return weights;
+}
+
+function getRequiredScore(required, available, weights) {
   const ratio = required === 0 ? 1 : available / required;
-  if (ratio === 1) return SCORE_WEIGHTS.requiredAttendees;
-  if (ratio >= 0.7) return Math.round(SCORE_WEIGHTS.requiredAttendees / 2);
+  if (ratio === 1) return Math.round(weights.requiredAttendees);
+  if (ratio >= 0.7) return Math.round(weights.requiredAttendees / 2);
   return 0;
 }
 
-function getAttendanceScore(total, available) {
-  return Math.round((available / total) * SCORE_WEIGHTS.attendanceRate);
+function getAttendanceScore(total, available, weights) {
+  return Math.round((available / total) * weights.attendanceRate);
 }
 
-function getPreferenceScore(total, matched) {
-  return Math.round((matched / total) * SCORE_WEIGHTS.preference);
+function getPreferenceScore(total, matched, weights) {
+  return Math.round((matched / total) * weights.preference);
 }
 
-function getContextScore(context) {
-  let score = SCORE_WEIGHTS.workContext;
-  if (context.afterLunch) score -= 3;
-  if (context.focusTime) score -= 5;
-  if (context.afterBusinessTrip) score -= 4;
-  if (context.backToBackMeeting) score -= 3;
-  return Math.max(score, 0);
+function getContextScore(context, weights) {
+  const unit = weights.workContext / 15;
+  let score = weights.workContext;
+  if (context.afterLunch) score -= 3 * unit;
+  if (context.focusTime) score -= 5 * unit;
+  if (context.afterBusinessTrip) score -= 4 * unit;
+  if (context.backToBackMeeting) score -= 3 * unit;
+  return Math.max(Math.round(score), 0);
 }
 
-function getFatigueScore(minutesBetweenMeetings) {
-  if (minutesBetweenMeetings >= 60) return 5;
-  if (minutesBetweenMeetings >= 30) return 3;
-  if (minutesBetweenMeetings >= 15) return 2;
+function getFatigueScore(minutesBetweenMeetings, weights) {
+  const unit = weights.fatigue / 5;
+  if (minutesBetweenMeetings >= 60) return Math.round(5 * unit);
+  if (minutesBetweenMeetings >= 30) return Math.round(3 * unit);
+  if (minutesBetweenMeetings >= 15) return Math.round(2 * unit);
   return 0;
 }
 
-function getTravelScore(buffer) {
-  if (buffer >= 15) return 5;
-  if (buffer >= 10) return 3;
+function getTravelScore(buffer, weights) {
+  const unit = weights.travelBuffer / 5;
+  if (buffer >= 15) return Math.round(5 * unit);
+  if (buffer >= 10) return Math.round(3 * unit);
   return 0;
 }
 
-function calculateMeetingScore(input) {
-  const requiredScore = getRequiredScore(input.requiredCount, input.requiredAvailable);
-  const attendanceScore = getAttendanceScore(input.totalCount, input.availableCount);
-  const preferenceScore = getPreferenceScore(input.totalCount, input.preferenceMatched);
-  const contextScore = getContextScore(input.context);
-  const fatigueScore = getFatigueScore(input.breakMinutes);
-  const travelScore = getTravelScore(input.travelBuffer);
+function calculateMeetingScore(input, weights) {
+  const requiredScore = getRequiredScore(input.requiredCount, input.requiredAvailable, weights);
+  const attendanceScore = getAttendanceScore(input.totalCount, input.availableCount, weights);
+  const preferenceScore = getPreferenceScore(input.totalCount, input.preferenceMatched, weights);
+  const contextScore = getContextScore(input.context, weights);
+  const fatigueScore = getFatigueScore(input.breakMinutes, weights);
+  const travelScore = getTravelScore(input.travelBuffer, weights);
 
   return {
     total: requiredScore + attendanceScore + preferenceScore + contextScore + fatigueScore + travelScore,
@@ -118,41 +178,43 @@ function getMeetingSummary(score) {
 // Icon + label metadata for rendering a score breakdown row per SCORE_WEIGHTS key.
 const SCORE_BREAKDOWN_META = [
   {
-    key: 'requiredScore', label: '필참 참석', max: SCORE_WEIGHTS.requiredAttendees,
+    key: 'requiredScore', weightKey: 'requiredAttendees', label: '필참 참석',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M3 19c.7-3 3-5 6-5s5.3 2 6 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="8" r="2.6" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 14.2c2.5.4 4 2.1 4.5 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
   },
   {
-    key: 'attendanceScore', label: '참석률', max: SCORE_WEIGHTS.attendanceRate,
+    key: 'attendanceScore', weightKey: 'attendanceRate', label: '참석률',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.5l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   },
   {
-    key: 'preferenceScore', label: '개인 선호', max: SCORE_WEIGHTS.preference,
+    key: 'preferenceScore', weightKey: 'preference', label: '개인 선호',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5h.01M15.5 10.5h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M8 14.5c1 1.2 2.4 1.8 4 1.8s3-.6 4-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
   },
   {
-    key: 'contextScore', label: '업무 맥락', max: SCORE_WEIGHTS.workContext,
+    key: 'contextScore', weightKey: 'workContext', label: '업무 맥락',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18" stroke="currentColor" stroke-width="1.8"/></svg>'
   },
   {
-    key: 'fatigueScore', label: '여유 시간', max: SCORE_WEIGHTS.fatigue,
+    key: 'fatigueScore', weightKey: 'fatigue', label: '여유 시간',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="8" width="18" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M22 10.5v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
   },
   {
-    key: 'travelScore', label: '이동 시간', max: SCORE_WEIGHTS.travelBuffer,
+    key: 'travelScore', weightKey: 'travelBuffer', label: '이동 시간',
     icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 1118.5 10c0 5.2-6.5 11-6.5 11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.8"/></svg>'
   },
 ];
 
-function buildScoreBreakdownHtml(detail) {
+function buildScoreBreakdownHtml(detail, weights) {
+  const w = weights || SCORE_WEIGHTS;
   return SCORE_BREAKDOWN_META.map(meta => {
     const value = detail[meta.key];
-    const pct = Math.round((value / meta.max) * 100);
+    const max = w[meta.weightKey];
+    const pct = Math.round((value / max) * 100);
     return `
       <div class="score-row">
         <span class="score-row-icon">${meta.icon}</span>
         <span class="score-row-label">${meta.label}</span>
         <span class="score-row-bar"><span class="score-row-fill" style="width:${pct}%"></span></span>
-        <span class="score-row-value">${value}<span class="score-row-max">/${meta.max}</span></span>
+        <span class="score-row-value">${value}<span class="score-row-max">/${Math.round(max)}</span></span>
       </div>`;
   }).join('');
 }
@@ -160,8 +222,8 @@ function buildScoreBreakdownHtml(detail) {
 // Full hand-authored heatmap + reasons for the top recommendation (slot 1),
 // matching the brief's worked example. Slots 2–3 are generated proportionally
 // to their scores so the grid stays internally consistent (color always
-// matches the underlying score). Each slot's own `score` is computed by
-// calculateMeetingScore() from scoreInput below, never hardcoded.
+// matches the underlying score). Score/rank/reasons are computed fresh per
+// meeting purpose by rankSlotsForPurpose() — never hardcoded here.
 const SLOTS = [
   {
     id: 1,
@@ -288,22 +350,85 @@ const SLOTS = [
   },
 ];
 
-// Compute each slot's score from its scoreInput (never hardcoded), then keep
-// the highest-scoring slot first so the hero card always shows the best option.
-SLOTS.forEach(slot => {
-  const { total, detail } = calculateMeetingScore(slot.scoreInput);
-  slot.score = total;
-  slot.detail = detail;
-  slot.summary = getMeetingSummary(total);
-  slot.scoreLabel = slot.summary.title;
-  slot.attendanceRate = Math.round((slot.scoreInput.availableCount / slot.scoreInput.totalCount) * 100);
-});
-SLOTS.sort((a, b) => b.score - a.score);
-
 const PAST_MEETINGS = [
   { dateLabel: '어제 오후 3:00 – 4:00', attendeeIds: ['minsu', 'younghee', 'chulsoo'] },
   { dateLabel: '7월 3일 오전 11:00 – 12:00', attendeeIds: ['jieun', 'suhyun', 'daeun', 'minsu'] },
 ];
+
+// 회의 상세의 "회의 생성 히스토리" 타임라인에 쓰이는 4단계 — 스테퍼(.stepper-step)의
+// data-step 값과 짝을 맞춘다.
+const HISTORY_STEPS = [
+  { id: 'recommend', label: '추천 완료' },
+  { id: 'collect', label: '필참 의견 수집' },
+  { id: 'consensus', label: '합의 완료' },
+  { id: 'confirm', label: '회의 확정' },
+];
+
+// ============================================================================
+// 목적별 추천 랭킹 — 매번 새로 계산한다 (사전계산/캐시하지 않음). SLOTS의 원본
+// people/reasons/columns 데이터는 건드리지 않고, 그 위에 목적별 점수/순위만 얹은
+// 뷰 객체 3개를 반환한다.
+// ============================================================================
+function rankSlotsForPurpose(purposeId) {
+  const purpose = MEETING_PURPOSES.find(p => p.id === purposeId) || MEETING_PURPOSES[0];
+  const weights = getPurposeWeights(purposeId);
+
+  const views = SLOTS.map(slot => {
+    const { total, detail } = calculateMeetingScore(slot.scoreInput, weights);
+    const summary = getMeetingSummary(total);
+    return Object.assign({}, slot, {
+      score: total,
+      detail,
+      weights,
+      summary,
+      scoreLabel: summary.title,
+      attendanceRate: Math.round((slot.scoreInput.availableCount / slot.scoreInput.totalCount) * 100),
+      dateISO: resolveSlotDate(slot),
+    });
+  });
+
+  views.sort((a, b) => {
+    if (purpose.sortBySoonest && a.dateISO !== b.dateISO) {
+      return a.dateISO < b.dateISO ? -1 : 1;
+    }
+    return b.score - a.score;
+  });
+
+  return views.slice(0, 3);
+}
+
+// 추천 이유 — 점수를 만든 실제 컨텍스트 필드에서 문장을 뽑아낸다(하드코딩 금지).
+// 마지막 한 줄은 항상 회의 목적에 맞춘 마무리 문장.
+function buildRecommendReasons(slot, purposeId) {
+  const purpose = MEETING_PURPOSES.find(p => p.id === purposeId) || MEETING_PURPOSES[0];
+  const c = slot.scoreInput.context;
+  const reasons = [];
+  if (slot.scoreInput.requiredAvailable === slot.scoreInput.requiredCount) reasons.push('필참 일정 충돌 없음');
+  if (!c.focusTime) reasons.push('집중 업무 시간 제외');
+  if (!c.backToBackMeeting) reasons.push('연속 회의 최소');
+  if (!c.afterBusinessTrip) reasons.push('외근 일정과 겹치지 않음');
+  if (slot.scoreInput.breakMinutes >= 30) reasons.push('일정 사이 이동시간 확보');
+  if (reasons.length === 0) reasons.push('참석자 업무 흐름을 종합적으로 고려함');
+
+  const top = reasons.slice(0, 3);
+  top.push(`${purpose.emphasis} 기준에 가장 적합`);
+  return top;
+}
+
+// 제외 이유 — 왜 이 후보가 1위가 아닌지, 약점이 되는 컨텍스트 필드를 문장화한다.
+function buildExclusionReasons(slot) {
+  const c = slot.scoreInput.context;
+  const reasons = [];
+  const missing = slot.scoreInput.requiredCount - slot.scoreInput.requiredAvailable;
+  if (missing > 0) reasons.push(`필참자 ${missing}명 불가`);
+  if (c.afterBusinessTrip) reasons.push('외근 직후 일정');
+  if (c.backToBackMeeting) reasons.push('연속 회의 있음');
+  if (c.focusTime) reasons.push('집중 업무 시간과 겹침');
+  if (slot.attendanceRate < 100) reasons.push(`참석률 낮음 (${slot.attendanceRate}%)`);
+  if (slot.scoreInput.breakMinutes < 30) reasons.push('일정 간 여유 부족');
+  if (reasons.length === 0) reasons.push('다른 후보보다 적합도가 낮음');
+  return reasons.slice(0, 3);
+}
 
 // ============================================================================
 // State
@@ -311,11 +436,19 @@ const PAST_MEETINGS = [
 const state = {
   selectedAttendeeIds: [],   // ids currently added to the meeting being created
   attendance: {},            // id -> true(필참) / false(선택 참석)
+  purpose: null,              // 선택된 회의 목적 id (MEETING_PURPOSES)
   meetingDate: '',           // ISO date (YYYY-MM-DD) currently selected on Screen 02 (특정 날짜 지정 모드)
   searchMode: 'period',      // 'period'(기간으로 찾기) | 'specific'(특정 날짜 지정)
   periodStart: '',           // ISO date — 기간으로 찾기 모드의 시작일
   periodEnd: '',             // ISO date — 기간으로 찾기 모드의 종료일
-  activeBooking: null,       // the booking currently shown on Screen 03
+  currentRecommendations: [], // rankSlotsForPurpose() 결과 (최대 3개), 이번 생성 흐름 동안 유지
+  requiredIds: [],           // 이번 회의의 필참자 id
+  optionalIds: [],           // 이번 회의의 선택 참석자 id
+  responses: {},             // { [slotId]: { [attendeeId]: true|false } } — 필참자 의견 수집 상태
+  respondDeadlineLabel: '오늘 오후 5시',
+  activeRespondPersonId: null,
+  consensusResult: [],       // computeConsensus() 결과 — 회의 확정 시 참고
+  activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
 };
 
@@ -377,6 +510,29 @@ function buildSlotLabel(slot) {
 }
 
 // ============================================================================
+// Screen 02 — 회의 목적 선택
+// ============================================================================
+function renderPurposeOptions() {
+  const wrap = document.getElementById('purpose-grid');
+  wrap.innerHTML = MEETING_PURPOSES.map(p => `
+    <div class="purpose-chip">
+      <input type="radio" name="purpose" id="purpose-${p.id}" value="${p.id}" ${state.purpose === p.id ? 'checked' : ''}>
+      <label for="purpose-${p.id}">
+        <span class="purpose-chip-icon">${p.icon}</span>
+        <span class="purpose-chip-label">${p.label}</span>
+        <span class="purpose-chip-desc">${p.desc}</span>
+      </label>
+    </div>`).join('');
+
+  wrap.querySelectorAll('input[name="purpose"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      state.purpose = radio.value;
+      syncAttendeeControls();
+    });
+  });
+}
+
+// ============================================================================
 // Screen 02 — attendee list (add / remove / require-optional)
 // ============================================================================
 function renderAttendeeList() {
@@ -395,7 +551,10 @@ function renderAttendeeList() {
       <li class="attendee-row">
         <div class="attendee-info">
           <span class="avatar">${a.name[0]}</span>
-          <span class="name">${a.name}</span>
+          <span class="attendee-info-text">
+            <span class="name">${a.name}</span>
+            <span class="team-tag">${a.team}</span>
+          </span>
         </div>
         <div class="attendee-row-actions">
           <div class="segmented" role="group" aria-label="${a.name} 참석 유형" data-person="${a.id}">
@@ -436,8 +595,13 @@ function syncAttendeeControls() {
   document.getElementById('attendee-count').textContent = `${count}명`;
 
   const findBtn = document.getElementById('find-time-btn');
-  findBtn.disabled = count === 0;
-  document.getElementById('find-time-hint').style.display = count === 0 ? 'block' : 'none';
+  const hint = document.getElementById('find-time-hint');
+  const blocked = count === 0 || !state.purpose;
+  findBtn.disabled = blocked;
+  hint.style.display = blocked ? 'block' : 'none';
+  hint.textContent = count === 0
+    ? '참석자를 1명 이상 추가하면 좋은 시간을 찾아드려요.'
+    : '회의 목적을 선택하면 좋은 시간을 찾아드려요.';
 
   const addBtn = document.getElementById('add-attendee-btn');
   const allAdded = count >= ATTENDEES.length;
@@ -468,7 +632,7 @@ function renderPickerList() {
   const pickerList = document.getElementById('picker-list');
   const query = pickerQuery.trim();
   const matches = query
-    ? ATTENDEES.filter(a => a.name.includes(query))
+    ? ATTENDEES.filter(a => a.name.includes(query) || a.team.includes(query))
     : ATTENDEES;
 
   if (matches.length === 0) {
@@ -484,7 +648,10 @@ function renderPickerList() {
     <label class="check-item">
       <input type="checkbox" data-person="${a.id}" ${pickerCheckedIds.includes(a.id) ? 'checked' : ''}>
       <span class="avatar">${a.name[0]}</span>
-      <span>${a.name}</span>
+      <span class="check-item-text">
+        <span class="name">${a.name}</span>
+        <span class="team-tag">${a.team}</span>
+      </span>
     </label>
   `).join('');
 
@@ -525,14 +692,24 @@ document.getElementById('picker-confirm-btn').addEventListener('click', () => {
   closeAttendeePicker();
 });
 
+// ============================================================================
+// Screen 02 — 추천 결과 (히어로 = 🥇, 대안 = 🥈🥉). 순위 + 이유가 1차 정보이고
+// 점수/히트맵은 "적합도 근거 보기" 아코디언 안에서만 확인할 수 있다.
+// ============================================================================
 function renderAltSlots() {
   const wrap = document.getElementById('alt-slots');
-  wrap.innerHTML = SLOTS.slice(1).map(slot => `
+  const medals = ['🥈', '🥉'];
+  wrap.innerHTML = state.currentRecommendations.slice(1).map((slot, i) => {
+    const reasons = buildRecommendReasons(slot, state.purpose);
+    return `
     <div class="alt-card-wrap">
       <div class="alt-card" data-toggle-slot="${slot.id}" role="button" tabindex="0" aria-expanded="false" aria-controls="alt-${slot.id}-evidence">
         <div class="alt-card-left">
-          <span class="alt-card-time">${buildSlotLabel(slot)}</span>
-          <span class="alt-card-meta">${slot.summary.title} · 참석률 ${slot.attendanceRate}%</span>
+          <span class="rank-badge">${medals[i]}</span>
+          <div>
+            <span class="alt-card-time">${buildSlotLabel(slot)}</span>
+            <span class="alt-card-meta">${reasons[0]}</span>
+          </div>
         </div>
         <div class="alt-card-right">
           <span class="alt-card-score">${slot.score}<span> 점</span></span>
@@ -542,8 +719,11 @@ function renderAltSlots() {
       <div class="evidence-panel" id="alt-${slot.id}-evidence">
         <div class="evidence-panel-inner">
           <div class="card">
+            <div class="card-title">추천 이유</div>
+            <ul class="reason-list">${reasons.map(r => `<li class="reason-item">${r}</li>`).join('')}</ul>
+          </div>
+          <div class="card">
             <div class="card-title">회의 적합도 계산 기준</div>
-            <p class="card-desc">${slot.summary.message}</p>
             <div class="criteria-list" id="alt-${slot.id}-criteria"></div>
           </div>
           <div class="card">
@@ -557,13 +737,13 @@ function renderAltSlots() {
               <span class="legend-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F5A623"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>가장 적합한 시간</span>
             </div>
           </div>
-          <button class="btn btn-primary btn-block" data-action="book" data-slot="${slot.id}">이 시간으로 예약</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
-  SLOTS.slice(1).forEach(slot => {
+  state.currentRecommendations.slice(1).forEach(slot => {
     mountEvidence(`alt-${slot.id}`, slot);
     const header = wrap.querySelector(`.alt-card[data-toggle-slot="${slot.id}"]`);
     const panel = document.getElementById(`alt-${slot.id}-evidence`);
@@ -576,6 +756,8 @@ function renderAltSlots() {
 
 function renderHeroCard(slot) {
   document.getElementById('hero-time').textContent = buildSlotLabel(slot);
+  document.getElementById('hero-reasons').innerHTML = buildRecommendReasons(slot, state.purpose)
+    .map(r => `<li class="reason-item">${r}</li>`).join('');
   document.getElementById('hero-score').innerHTML = `${slot.score}<span class="score-unit">점</span>`;
   const labelEl = document.getElementById('hero-score-label');
   labelEl.textContent = slot.scoreLabel;
@@ -585,15 +767,16 @@ function renderHeroCard(slot) {
 }
 
 document.getElementById('find-time-btn').addEventListener('click', () => {
-  if (state.selectedAttendeeIds.length === 0) return;
+  if (state.selectedAttendeeIds.length === 0 || !state.purpose) return;
   document.getElementById('meeting-form').style.display = 'none';
   document.getElementById('loading-wrap').style.display = 'flex';
   setStepper('recommend', 'create');
   setTimeout(() => {
+    state.currentRecommendations = rankSlotsForPurpose(state.purpose);
     document.getElementById('loading-wrap').style.display = 'none';
     document.getElementById('meeting-results').style.display = 'block';
-    renderHeroCard(SLOTS[0]);
-    mountEvidence('hero', SLOTS[0]);
+    renderHeroCard(state.currentRecommendations[0]);
+    mountEvidence('hero', state.currentRecommendations[0]);
     renderAltSlots();
   }, 900);
 });
@@ -601,6 +784,22 @@ document.getElementById('find-time-btn').addEventListener('click', () => {
 document.getElementById('edit-attendees-btn').addEventListener('click', () => {
   document.getElementById('meeting-results').style.display = 'none';
   document.getElementById('meeting-form').style.display = 'block';
+});
+
+// "필참자에게 제안하기" — 추천은 여기서 확정되지 않는다. 필참자 응답을 모으는
+// 단계로 넘어갈 뿐이다.
+document.getElementById('propose-btn').addEventListener('click', () => {
+  state.requiredIds = state.selectedAttendeeIds.filter(id => state.attendance[id]);
+  state.optionalIds = state.selectedAttendeeIds.filter(id => !state.attendance[id]);
+  if (state.requiredIds.length === 0) {
+    showToast('필참자를 1명 이상 지정해주세요.');
+    return;
+  }
+  state.responses = {};
+  state.currentRecommendations.forEach(slot => { state.responses[slot.id] = {}; });
+  renderCollectScreen();
+  setStepper('collect', 'collect');
+  showScreen('collect');
 });
 
 // Reset the creation flow to a blank slate — used whenever the user starts a brand-new meeting.
@@ -692,6 +891,11 @@ document.getElementById('period-end-input').addEventListener('change', (e) => {
 function resetCreateFlow() {
   state.selectedAttendeeIds = [];
   state.attendance = {};
+  state.purpose = null;
+  state.currentRecommendations = [];
+  state.requiredIds = [];
+  state.optionalIds = [];
+  state.responses = {};
   setMeetingDate(toISODate(new Date()));
   setSearchMode('period');
   document.getElementById('period-quick-thisweek').checked = true;
@@ -700,6 +904,7 @@ function resetCreateFlow() {
   document.getElementById('meeting-results').style.display = 'none';
   document.getElementById('loading-wrap').style.display = 'none';
   document.getElementById('meeting-form').style.display = 'block';
+  renderPurposeOptions();
   setStepper('recommend', 'create');
   renderAttendeeList();
 
@@ -716,7 +921,8 @@ document.getElementById('new-meeting-btn').addEventListener('click', () => {
 });
 
 // ============================================================================
-// Stepper
+// Stepper (4단계: 추천 → 의견수집 → 합의 → 확정) — screen-create/collect/consensus
+// 각 화면의 .stepper-step 중 현재 단계에만 .current를 준다.
 // ============================================================================
 function setStepper(step, screenId) {
   const scope = screenId ? document.getElementById(`screen-${screenId}`) : document;
@@ -748,7 +954,231 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
 });
 
 // ============================================================================
-// Screen 03 — booking detail (date/attendees lead, suitability is secondary)
+// Screen 03 — 필참자 의견 수집 (인터랙티브 데모: 조직자가 각 필참자 행을 눌러
+// 그 사람 입장에서 응답을 시뮬레이션한다)
+// ============================================================================
+function deriveAttendeeLeaning(personId, slot) {
+  const idx = slot.columns.indexOf(slot.recommendedCol);
+  const status = slot.people[personId] && slot.people[personId].status[idx];
+  return status !== 'bad';
+}
+
+function isPersonResponded(personId) {
+  return state.currentRecommendations.some(slot =>
+    state.responses[slot.id] && state.responses[slot.id][personId] !== undefined);
+}
+
+function summarizePersonResponse(personId) {
+  const okSlots = state.currentRecommendations.filter(slot =>
+    state.responses[slot.id] && state.responses[slot.id][personId] === true);
+  if (okSlots.length === 0) return '참석이 어려워요';
+  return okSlots.map(s => buildSlotLabel(s)).join(', ') + ' 가능';
+}
+
+function renderCollectScreen() {
+  const medals = ['🥇', '🥈', '🥉'];
+  document.getElementById('collect-candidates').innerHTML = state.currentRecommendations.map((slot, i) => `
+    <div class="mini-candidate-card">
+      <span class="mini-candidate-medal">${medals[i]}</span>
+      <span>${buildSlotLabel(slot)}</span>
+    </div>`).join('');
+
+  const requiredPeople = state.requiredIds.map(id => ATTENDEES.find(a => a.id === id));
+  const respondedCount = requiredPeople.filter(p => isPersonResponded(p.id)).length;
+
+  document.getElementById('collect-progress-count').textContent = `${respondedCount} / ${requiredPeople.length}`;
+  const pct = requiredPeople.length ? Math.round((respondedCount / requiredPeople.length) * 100) : 0;
+  document.getElementById('collect-progress-fill').style.width = `${pct}%`;
+  document.getElementById('collect-deadline').textContent = state.respondDeadlineLabel;
+
+  const listWrap = document.getElementById('collect-responder-list');
+  listWrap.innerHTML = requiredPeople.map(p => {
+    const responded = isPersonResponded(p.id);
+    const summary = responded ? summarizePersonResponse(p.id) : '아직 응답하지 않았어요';
+    return `
+      <li class="responder-row ${responded ? 'responded' : ''}" data-person="${p.id}">
+        <div class="attendee-info">
+          <span class="avatar">${p.name[0]}</span>
+          <div>
+            <div class="name">${p.name}</div>
+            <div class="responder-summary">${p.team} · ${summary}</div>
+          </div>
+        </div>
+        <span class="status-chip ${responded ? 'status-chip--done' : 'status-chip--pending'}">${responded ? '응답 완료' : '미응답'}</span>
+      </li>`;
+  }).join('');
+
+  listWrap.querySelectorAll('.responder-row').forEach(row => {
+    row.addEventListener('click', () => openRespondSheet(row.dataset.person));
+  });
+}
+
+document.getElementById('collect-remind-btn').addEventListener('click', () => {
+  showToast('미응답 필참자에게 리마인드를 보냈어요.');
+});
+
+document.getElementById('collect-done-btn').addEventListener('click', () => {
+  renderConsensusScreen();
+  setStepper('consensus', 'consensus');
+  showScreen('consensus');
+});
+
+// ---- 응답 시뮬레이션 바텀시트 ----
+function openRespondSheet(personId) {
+  state.activeRespondPersonId = personId;
+  const person = ATTENDEES.find(a => a.id === personId);
+  document.getElementById('respond-sheet-title').textContent = `${person.name}님으로 응답해보기 (데모)`;
+
+  const optionsWrap = document.getElementById('respond-sheet-options');
+  optionsWrap.innerHTML = state.currentRecommendations.map(slot => {
+    const existing = state.responses[slot.id] && state.responses[slot.id][personId];
+    const leaning = existing !== undefined ? existing : deriveAttendeeLeaning(personId, slot);
+    return `
+      <label class="check-item">
+        <input type="checkbox" class="respond-slot-checkbox" data-slot="${slot.id}" ${leaning ? 'checked' : ''}>
+        <span>${buildSlotLabel(slot)}</span>
+      </label>`;
+  }).join('');
+
+  const allBad = state.currentRecommendations.every(slot => !deriveAttendeeLeaning(personId, slot));
+  document.getElementById('respond-decline-checkbox').checked = allBad;
+  syncRespondSheetState();
+
+  optionsWrap.querySelectorAll('.respond-slot-checkbox').forEach(box => {
+    box.addEventListener('change', () => {
+      if (box.checked) document.getElementById('respond-decline-checkbox').checked = false;
+      syncRespondSheetState();
+    });
+  });
+
+  document.getElementById('respond-sheet-overlay').classList.add('open');
+}
+
+function syncRespondSheetState() {
+  const declineBox = document.getElementById('respond-decline-checkbox');
+  document.querySelectorAll('.respond-slot-checkbox').forEach(box => {
+    box.disabled = declineBox.checked;
+    if (declineBox.checked) box.checked = false;
+  });
+}
+
+document.getElementById('respond-decline-checkbox').addEventListener('change', syncRespondSheetState);
+
+function closeRespondSheet() {
+  document.getElementById('respond-sheet-overlay').classList.remove('open');
+}
+
+document.getElementById('respond-sheet-close-btn').addEventListener('click', closeRespondSheet);
+document.getElementById('respond-sheet-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'respond-sheet-overlay') closeRespondSheet();
+});
+
+document.getElementById('respond-submit-btn').addEventListener('click', () => {
+  const personId = state.activeRespondPersonId;
+  const declineBox = document.getElementById('respond-decline-checkbox');
+  state.currentRecommendations.forEach(slot => {
+    if (!state.responses[slot.id]) state.responses[slot.id] = {};
+    if (declineBox.checked) {
+      state.responses[slot.id][personId] = false;
+    } else {
+      const box = document.querySelector(`.respond-slot-checkbox[data-slot="${slot.id}"]`);
+      state.responses[slot.id][personId] = box.checked;
+    }
+  });
+  closeRespondSheet();
+  const person = ATTENDEES.find(a => a.id === personId);
+  showToast(`${person.name}님이 응답했어요.`);
+  renderCollectScreen();
+});
+
+// ============================================================================
+// Screen 04 — MeetFit 합의 결과
+// ============================================================================
+function computeConsensus(recommendations, requiredIds) {
+  return recommendations.map(slot => {
+    const available = requiredIds.filter(id => state.responses[slot.id] && state.responses[slot.id][id] === true);
+    return {
+      slot,
+      requiredTotal: requiredIds.length,
+      availableCount: available.length,
+    };
+  }).sort((a, b) => {
+    if (b.availableCount !== a.availableCount) return b.availableCount - a.availableCount;
+    return b.slot.score - a.slot.score;
+  });
+}
+
+function buildConsensusReasons(entry, purposeId) {
+  const purpose = MEETING_PURPOSES.find(p => p.id === purposeId) || MEETING_PURPOSES[0];
+  const reasons = [];
+  reasons.push(entry.availableCount === entry.requiredTotal
+    ? '모든 필참자가 선택한 시간입니다.'
+    : `필참자 ${entry.availableCount}/${entry.requiredTotal}명이 선택한 시간입니다.`);
+  reasons.push(`회의 목적(${purpose.label})에 적합합니다.`);
+  reasons.push('업무 흐름 영향이 적습니다.');
+  if (entry.slot.scoreInput.travelBuffer >= 15) reasons.push('이동시간을 확보했습니다.');
+  return reasons.slice(0, 4);
+}
+
+function buildConsensusExclusionReasons(entry) {
+  const reasons = [];
+  const missing = entry.requiredTotal - entry.availableCount;
+  if (missing > 0) reasons.push(`필참자 ${missing}명 불가`);
+  reasons.push(...buildExclusionReasons(entry.slot).filter(r => !r.startsWith('필참자')));
+  return reasons.slice(0, 3);
+}
+
+function renderConsensusScreen() {
+  const consensus = computeConsensus(state.currentRecommendations, state.requiredIds);
+  state.consensusResult = consensus;
+  const top = consensus[0];
+  const medals = ['🏆', '🥈', '🥉'];
+
+  document.getElementById('consensus-time').textContent = buildSlotLabel(top.slot);
+  document.getElementById('consensus-attendance').textContent = `${top.availableCount} / ${top.requiredTotal}`;
+  document.getElementById('consensus-reasons').innerHTML = buildConsensusReasons(top, state.purpose)
+    .map(r => `<li class="reason-item">${r}</li>`).join('');
+  mountEvidence('consensus', top.slot);
+
+  document.getElementById('consensus-candidate-list').innerHTML = consensus.map((entry, i) => {
+    const statusText = entry.requiredTotal === 0
+      ? '필참자 없음'
+      : entry.availableCount === entry.requiredTotal
+        ? '필참 전원 가능'
+        : entry.availableCount === 0
+          ? '참석률 낮음'
+          : `필참 ${entry.requiredTotal - entry.availableCount}명 확인 필요`;
+    return `
+      <div class="consensus-card ${i === 0 ? 'top' : ''}">
+        <span class="rank-badge">${medals[i] || '·'}</span>
+        <div class="consensus-card-body">
+          <span class="consensus-card-time">${buildSlotLabel(entry.slot)}</span>
+          <span class="consensus-card-status">${statusText}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('consensus-exclusions').innerHTML = consensus.slice(1).map(entry => `
+    <div class="exclusion-item">
+      <p class="exclusion-question">왜 ${buildSlotLabel(entry.slot)}이 아닌가요?</p>
+      <ul class="reason-list muted">${buildConsensusExclusionReasons(entry).map(r => `<li class="reason-item">${r}</li>`).join('')}</ul>
+    </div>`).join('');
+
+  document.getElementById('consensus-confirm-btn').dataset.slot = top.slot.id;
+}
+
+document.getElementById('consensus-evidence-toggle').addEventListener('click', function () {
+  toggleEvidencePanel(document.getElementById('consensus-evidence-panel'), this);
+});
+
+document.getElementById('consensus-confirm-btn').addEventListener('click', function () {
+  const slotId = Number(this.dataset.slot);
+  const slot = state.currentRecommendations.find(s => s.id === slotId);
+  confirmBooking(slot);
+});
+
+// ============================================================================
+// Screen 06 — booking detail (date/attendees lead, suitability is secondary)
 // ============================================================================
 function buildAttendeeSummaryHtml(attendeeIds) {
   const people = attendeeIds.map(id => ATTENDEES.find(a => a.id === id));
@@ -763,7 +1193,27 @@ function renderDetail(booking) {
   const slot = booking.slot;
 
   document.getElementById('detail-time').textContent = booking.label;
+  document.getElementById('detail-purpose-chip').textContent = booking.purpose.label;
   document.getElementById('detail-attendees').innerHTML = buildAttendeeSummaryHtml(booking.attendeeIds);
+
+  document.getElementById('detail-required-summary').textContent = booking.requiredIds.length === 0
+    ? '필참자 없음'
+    : booking.requiredSummary.available === booking.requiredSummary.total
+      ? `필참 전원 확정 (${booking.requiredSummary.total}명)`
+      : `필참 ${booking.requiredSummary.available}/${booking.requiredSummary.total}명 확정`;
+
+  renderOptionalList(booking);
+
+  document.getElementById('detail-reason-text').textContent =
+    `이번 회의는 ${booking.purpose.emphasis}과 필참자의 합의를 가장 우선하여 추천되었어요.`;
+
+  document.getElementById('detail-history').innerHTML = HISTORY_STEPS.map(step => `
+    <div class="history-step">
+      <span class="history-step-dot">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="history-step-label">${step.label}</span>
+    </div>`).join('');
 
   document.getElementById('detail-score').innerHTML = `${slot.score}<span class="score-unit">점</span>`;
   const labelEl = document.getElementById('detail-score-label');
@@ -771,9 +1221,84 @@ function renderDetail(booking) {
   labelEl.className = `score-label score-label--${scoreLabelClass(slot.score)}`;
   document.getElementById('detail-desc').textContent = slot.summary.message;
 
-  document.getElementById('criteria-list').innerHTML = buildScoreBreakdownHtml(slot.detail);
+  document.getElementById('criteria-list').innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
   mountHeatmap(document.getElementById('heatmap'), slot);
 }
+
+function renderOptionalList(booking) {
+  const wrap = document.getElementById('detail-optional-list');
+  if (booking.optionalIds.length === 0) {
+    wrap.innerHTML = `<li class="attendee-empty">선택 참석자가 없어요</li>`;
+    document.getElementById('detail-optional-summary').textContent = '';
+    return;
+  }
+
+  const accepted = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'accepted');
+  const declined = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'declined');
+  const pending = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'pending');
+  document.getElementById('detail-optional-summary').textContent =
+    `${accepted.length}명 참석 · ${declined.length}명 불참 · ${pending.length}명 미응답`;
+
+  wrap.innerHTML = booking.optionalIds.map(id => {
+    const person = ATTENDEES.find(a => a.id === id);
+    const status = booking.optionalStatus[id];
+    const label = status === 'accepted' ? '참석' : status === 'declined' ? '불참' : '미응답';
+    const statusClass = status === 'accepted' ? 'status-chip--done' : status === 'declined' ? 'status-chip--declined' : 'status-chip--pending';
+    return `
+      <li class="responder-row ${status !== 'pending' ? 'responded' : ''}" data-person="${id}">
+        <div class="attendee-info">
+          <span class="avatar">${person.name[0]}</span>
+          <span class="attendee-info-text">
+            <span class="name">${person.name}</span>
+            <span class="team-tag">${person.team}</span>
+          </span>
+        </div>
+        <span class="status-chip ${statusClass}">${label}</span>
+      </li>`;
+  }).join('');
+
+  wrap.querySelectorAll('.responder-row').forEach(row => {
+    row.addEventListener('click', () => {
+      if (booking.optionalStatus[row.dataset.person] === 'pending') openOptinSheet(row.dataset.person);
+    });
+  });
+}
+
+// ---- 선택 참석자 알림 시트 (데모: 회의 확정 후 참석 여부만 시뮬레이션) ----
+function openOptinSheet(personId) {
+  state.activeRespondPersonId = personId;
+  const person = ATTENDEES.find(a => a.id === personId);
+  document.getElementById('optin-sheet-avatar').textContent = person.name[0];
+  document.getElementById('optin-sheet-name').textContent = person.name;
+  document.getElementById('optin-sheet-time').textContent = state.activeBooking.label;
+  document.getElementById('optin-sheet-overlay').classList.add('open');
+}
+
+function closeOptinSheet() {
+  document.getElementById('optin-sheet-overlay').classList.remove('open');
+}
+
+document.getElementById('optin-sheet-close-btn').addEventListener('click', closeOptinSheet);
+document.getElementById('optin-sheet-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'optin-sheet-overlay') closeOptinSheet();
+});
+
+function respondOptin(status) {
+  const booking = state.activeBooking;
+  const personId = state.activeRespondPersonId;
+  booking.optionalStatus[personId] = status;
+  closeOptinSheet();
+  const person = ATTENDEES.find(a => a.id === personId);
+  showToast(`${person.name}님이 ${status === 'accepted' ? '참석' : '불참'}으로 응답했어요.`);
+  renderOptionalList(booking);
+}
+
+document.getElementById('optin-accept-btn').addEventListener('click', () => respondOptin('accepted'));
+document.getElementById('optin-decline-btn').addEventListener('click', () => respondOptin('declined'));
+
+document.getElementById('detail-evidence-toggle').addEventListener('click', function () {
+  toggleEvidencePanel(document.getElementById('detail-evidence-panel'), this);
+});
 
 function buildHeatmapHtml(slot) {
   let html = `<div></div>`; // top-left empty corner
@@ -813,7 +1338,7 @@ function mountHeatmap(container, slot) {
 // Fills the criteria + heatmap for an inline accordion, given an id prefix
 // (e.g. 'hero' or 'alt-2') matching '#{prefix}-criteria' / '#{prefix}-heatmap'.
 function mountEvidence(prefix, slot) {
-  document.getElementById(`${prefix}-criteria`).innerHTML = buildScoreBreakdownHtml(slot.detail);
+  document.getElementById(`${prefix}-criteria`).innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
   mountHeatmap(document.getElementById(`${prefix}-heatmap`), slot);
 }
 
@@ -843,6 +1368,7 @@ function openPersonSheet(personId, slotId) {
 
   document.getElementById('sheet-avatar').textContent = person.name[0];
   document.getElementById('sheet-name').textContent = person.name;
+  document.getElementById('sheet-team').textContent = person.team;
   document.getElementById('sheet-score').textContent = data.score;
   const tag = document.getElementById('sheet-tag');
   tag.textContent = data.tag;
@@ -861,47 +1387,69 @@ document.getElementById('sheet-overlay').addEventListener('click', (e) => {
   if (e.target.id === 'sheet-overlay') closePersonSheet();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePersonSheet(); closeConfirmDialog(); }
+  if (e.key === 'Escape') {
+    closePersonSheet();
+    closeConfirmDialog();
+    closeRespondSheet();
+    closeOptinSheet();
+  }
 });
 
 // ============================================================================
-// Global action delegation — book buttons (hero card, alt card panels, Screen 03)
+// 회의 확정 — MeetFit 합의 결과 화면에서만 호출된다 (추천 단계에서는 예약이
+// 일어나지 않는다). 확정 후에는 홈이 아니라 회의 상세 화면으로 바로 이동한다.
 // ============================================================================
-document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action="book"]');
-  if (!el) return;
-  const slot = SLOTS.find(s => s.id === Number(el.dataset.slot));
-  confirmBooking(slot);
-});
-
 function confirmBooking(slot) {
   const attendeeIds = state.selectedAttendeeIds.length ? [...state.selectedAttendeeIds] : Object.keys(slot.people);
   const label = buildSlotLabel(slot); // snapshot — the date picker may change after this
-  state.bookings.push({ id: Date.now(), slot, attendeeIds, label });
-  showToast(`${label} 회의가 예약됐어요.`);
+  const purpose = MEETING_PURPOSES.find(p => p.id === state.purpose) || MEETING_PURPOSES[0];
+
+  const consensusEntry = state.consensusResult.find(e => e.slot.id === slot.id);
+  const requiredSummary = consensusEntry
+    ? { available: consensusEntry.availableCount, total: consensusEntry.requiredTotal }
+    : { available: state.requiredIds.length, total: state.requiredIds.length };
+
+  const optionalStatus = {};
+  state.optionalIds.forEach(id => { optionalStatus[id] = 'pending'; });
+
+  const booking = {
+    id: Date.now(),
+    slot,
+    attendeeIds,
+    label,
+    purpose,
+    requiredIds: [...state.requiredIds],
+    optionalIds: [...state.optionalIds],
+    optionalStatus,
+    requiredSummary,
+  };
+
+  state.bookings.push(booking);
+  showToast(`${label} 회의가 확정됐어요.`);
   resetCreateFlow();
   renderHome();
-  showScreen('home');
+  renderDetail(booking);
+  showScreen('detail');
 }
 
 document.getElementById('detail-back-btn').addEventListener('click', () => {
   showScreen('home');
 });
 
-// Reschedule: drop the current booking but carry its attendees into a fresh search.
+// Reschedule: drop the current booking but carry its attendees + purpose into a fresh search.
 document.getElementById('detail-reschedule-btn').addEventListener('click', () => {
   const booking = state.activeBooking;
   state.bookings = state.bookings.filter(b => b.id !== booking.id);
   resetCreateFlow();
   state.selectedAttendeeIds = [...booking.attendeeIds];
+  state.purpose = booking.purpose.id;
   booking.attendeeIds.forEach(id => {
-    if (!(id in state.attendance)) {
-      state.attendance[id] = true; // new attendees default to 필참
-    }
+    state.attendance[id] = booking.requiredIds.includes(id);
   });
+  renderPurposeOptions();
   renderAttendeeList();
   renderHome();
-  showToast('참석자는 그대로 뒀어요. 새 시간을 찾아보세요.');
+  showToast('참석자와 회의 목적은 그대로 뒀어요. 새 시간을 찾아보세요.');
   showScreen('create');
 });
 
@@ -979,7 +1527,7 @@ function renderHome() {
           <div class="meeting-item-attendees">${avatarStackHtml(b.attendeeIds)}</div>
         </div>
         <div class="meeting-item-right">
-          <span class="meeting-item-score">${b.slot.score}<span> 점</span></span>
+          <span class="meeting-item-done-tag">확정 완료</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
       </div>`
@@ -1018,5 +1566,6 @@ setMeetingDate(toISODate(new Date()));
 setSearchMode('period');
 document.getElementById('period-quick-thisweek').checked = true;
 setPeriodQuick('thisweek');
+renderPurposeOptions();
 renderAttendeeList();
 renderHome();
