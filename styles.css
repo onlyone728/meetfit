@@ -266,6 +266,15 @@ select:focus-visible,
   color: var(--color-text);
 }
 
+.brand-clickable {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.brand-clickable:hover {
+  opacity: 0.8;
+}
+
 .brand-symbol {
   width: 30px;
   height: 30px;
@@ -335,6 +344,9 @@ select:focus-visible,
   height: 36px;
   border-radius: 50%;
   background: var(--color-primary-light);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--color-primary);
   display: flex;
   align-items: center;
@@ -1279,6 +1291,27 @@ select.minute-select {
   font-size: 14px;
   background: var(--color-primary-light);
   color: var(--color-primary);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.profile-photo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.profile-avatar-preview {
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+}
+
+.profile-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .attendee-info .name {

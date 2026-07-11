@@ -219,11 +219,28 @@ function buildScoreBreakdownHtml(detail, weights) {
   }).join('');
 }
 
+// 히트맵 셀 상태 → 뱃지 문구/색상. 셀 하나의 진실은 오직 status 하나뿐이라, 클릭했을
+// 때 보여줄 태그/색상은 항상 이 맵에서 파생시킨다 — 사람이 별도로 tag를 잘못 적어서
+// 셀 색깔과 안 맞는 문제가 구조적으로 생기지 않는다.
+// tagClass는 score-label--* 클래스명이다. heatmap-cell.good은 success(초록) 색이고
+// score-label--good은 primary(파랑) 색이라 이름은 같아도 실제 색이 달랐다 — 초록으로
+// 렌더링되는 score-label--great를 대신 매핑해서 히트맵 셀 색과 상세 시트 색을 맞춘다.
+const HEATMAP_STATUS_META = {
+  good: { tag: '회의하기 좋음', tagClass: 'great' },
+  caution: { tag: '가능하지만 비추천', tagClass: 'caution' },
+  bad: { tag: '참석 어려움', tagClass: 'poor' },
+};
+
 // Full hand-authored heatmap + reasons for the top recommendation (slot 1),
 // matching the brief's worked example. Slots 2–3 are generated proportionally
 // to their scores so the grid stays internally consistent (color always
 // matches the underlying score). Score/rank/reasons are computed fresh per
 // meeting purpose by rankSlotsForPurpose() — never hardcoded here.
+//
+// people[personId].cells[i]는 columns[i](=그 사람이 클릭한 바로 그 시간)에 대한
+// status/score/reasons를 담는다 — 셀마다 독립적이라 어떤 컬럼을 클릭해도 그 컬럼의
+// 실제 색깔과 이유가 항상 일치한다. 각자 성향(집중 업무 시간대, 선호 오전/오후,
+// 외근 등)을 반영해 셀마다 다르게 손으로 채웠다.
 const SLOTS = [
   {
     id: 1,
@@ -240,30 +257,60 @@ const SLOTS = [
     columns: ['11:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
     recommendedCol: '14:00',
     people: {
-      minsu: {
-        status: ['caution', 'caution', 'good', 'good', 'good', 'caution'], score: 92, tag: '추천', tagClass: 'great',
-        reasons: ['오전 집중 업무 종료', '외근 일정 없음', '다음 일정까지 충분한 여유']
-      },
-      younghee: {
-        status: ['good', 'caution', 'caution', 'good', 'good', 'bad'], score: 71, tag: '가능하지만 비추천', tagClass: 'caution',
-        reasons: ['점심 직후', '개인 선호 시간 아님']
-      },
-      chulsoo: {
-        status: ['good', 'good', 'caution', 'bad', 'bad', 'caution'], score: 78, tag: '가능하지만 비추천', tagClass: 'caution',
-        reasons: ['외근 직후 이동 여유 부족', '선호 시간 아님']
-      },
-      jieun: {
-        status: ['caution', 'caution', 'good', 'good', 'caution', 'bad'], score: 90, tag: '추천', tagClass: 'great',
-        reasons: ['집중 업무 시간 아님', '다음 일정까지 여유 충분']
-      },
-      suhyun: {
-        status: ['good', 'caution', 'good', 'good', 'good', 'caution'], score: 88, tag: '추천', tagClass: 'great',
-        reasons: ['외근 일정 없음', '선호 시간(오후)과 일치']
-      },
-      daeun: {
-        status: ['good', 'good', 'good', 'caution', 'good', 'bad'], score: 85, tag: '추천', tagClass: 'great',
-        reasons: ['이동시간 확보됨', '연속 회의 없음']
-      },
+      // 민수: 집중 업무 09:00–11:00, 오후 들어서면서 여유로워지다 퇴근 직전엔 다시 촉박
+      minsu: { cells: [
+        { status: 'caution', score: 78, reasons: ['집중 업무 직후라 전환 여유 부족'] },
+        { status: 'caution', score: 76, reasons: ['점심 직후라 살짝 피로'] },
+        { status: 'good', score: 93, reasons: ['집중 업무·점심 영향 모두 없음', '다음 일정까지 여유 충분'] },
+        { status: 'good', score: 91, reasons: ['오후 컨디션 좋음'] },
+        { status: 'good', score: 90, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 74, reasons: ['퇴근 전 마지막 시간대라 여유 부족'] },
+      ] },
+      // 영희: 오전 선호, 점심 직후·퇴근 직전은 "가능하면 피해주세요"에 등록해둔 회피 시간
+      younghee: { cells: [
+        { status: 'good', score: 88, reasons: ['오전 선호 시간과 일치'] },
+        { status: 'bad', score: 58, reasons: ['점심 직후 피로도 높음 (회피 시간)'] },
+        { status: 'good', score: 85, reasons: ['점심 여파가 거의 사라짐', '무리 없이 참석 가능'] },
+        { status: 'good', score: 87, reasons: ['오후 중반, 무리 없음'] },
+        { status: 'good', score: 86, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 72, reasons: ['퇴근 직전이라 여유 부족 (회피 시간)'] },
+      ] },
+      // 철수: 이날 오전~점심 외근. 외근 전후 각 1시간은 회의 불가 시간으로 자동 제외.
+      chulsoo: { cells: [
+        { status: 'bad', score: 35, reasons: ['외근 중'] },
+        { status: 'bad', score: 42, reasons: ['외근 후 복귀 시간'] },
+        { status: 'good', score: 86, reasons: ['외근 후 복귀 시간이 끝나 무리 없이 참석 가능'] },
+        { status: 'good', score: 90, reasons: ['외근 영향에서 벗어난 시간'] },
+        { status: 'good', score: 91, reasons: ['업무 흐름상 무리 없음'] },
+        { status: 'caution', score: 76, reasons: ['퇴근 직전이라 살짝 촉박'] },
+      ] },
+      // 지은: 집중 업무 시간 없음, 오후를 약간 더 선호
+      jieun: { cells: [
+        { status: 'caution', score: 76, reasons: ['집중 업무 시간은 아니지만 오전은 비선호'] },
+        { status: 'caution', score: 74, reasons: ['점심 직후라 약간 여유 부족'] },
+        { status: 'good', score: 92, reasons: ['업무 흐름상 무리 없음'] },
+        { status: 'good', score: 94, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'caution', score: 78, reasons: ['다음 일정과 다소 근접'] },
+        { status: 'bad', score: 55, reasons: ['퇴근 직전, 회의 잡기 어려움'] },
+      ] },
+      // 수현: 오후 선호, 외근 없음
+      suhyun: { cells: [
+        { status: 'caution', score: 75, reasons: ['오전은 선호 시간 아님'] },
+        { status: 'good', score: 89, reasons: ['점심 영향 적음'] },
+        { status: 'good', score: 95, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 93, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 90, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 77, reasons: ['퇴근 직전이라 살짝 촉박'] },
+      ] },
+      // 다은: 무난, 이동시간 여유를 중요하게 봄
+      daeun: { cells: [
+        { status: 'good', score: 90, reasons: ['이동시간 여유 충분'] },
+        { status: 'good', score: 91, reasons: ['점심 이후 이동 여유 확보됨'] },
+        { status: 'good', score: 93, reasons: ['연속 회의 없음'] },
+        { status: 'caution', score: 79, reasons: ['다음 일정과 조금 근접'] },
+        { status: 'good', score: 88, reasons: ['이동시간 확보됨'] },
+        { status: 'bad', score: 58, reasons: ['퇴근 직전, 연속 회의 부담'] },
+      ] },
     },
   },
   {
@@ -281,30 +328,49 @@ const SLOTS = [
     columns: ['13:30', '14:30', '15:30', '16:30', '17:30'],
     recommendedCol: '15:30',
     people: {
-      minsu: {
-        status: ['caution', 'good', 'good', 'good', 'caution'], score: 88, tag: '추천', tagClass: 'great',
-        reasons: ['집중 업무 시간 아님', '연속 회의 사이 여유 있음']
-      },
-      younghee: {
-        status: ['caution', 'good', 'good', 'good', 'bad'], score: 84, tag: '추천', tagClass: 'great',
-        reasons: ['점심 영향 적음', '외근 일정 없음']
-      },
-      chulsoo: {
-        status: ['good', 'caution', 'caution', 'bad', 'bad'], score: 68, tag: '가능하지만 비추천', tagClass: 'caution',
-        reasons: ['외근 직후 이동 여유 부족']
-      },
-      jieun: {
-        status: ['caution', 'good', 'good', 'caution', 'bad'], score: 86, tag: '추천', tagClass: 'great',
-        reasons: ['다음 일정까지 여유 충분']
-      },
-      suhyun: {
-        status: ['good', 'good', 'good', 'good', 'caution'], score: 90, tag: '추천', tagClass: 'great',
-        reasons: ['선호 시간(오후)과 일치', '외근 일정 없음']
-      },
-      daeun: {
-        status: ['good', 'good', 'caution', 'good', 'bad'], score: 83, tag: '추천', tagClass: 'great',
-        reasons: ['이동시간 확보됨']
-      },
+      minsu: { cells: [
+        { status: 'caution', score: 78, reasons: ['점심 직후라 약간 여유 부족'] },
+        { status: 'good', score: 89, reasons: ['점심 영향에서 벗어남'] },
+        { status: 'good', score: 91, reasons: ['업무 흐름상 무리 없음'] },
+        { status: 'good', score: 90, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 74, reasons: ['퇴근 직전이라 다소 촉박'] },
+      ] },
+      younghee: { cells: [
+        { status: 'bad', score: 55, reasons: ['점심 직후 피로도 높음 (회피 시간)'] },
+        { status: 'caution', score: 75, reasons: ['점심 여파가 아직 남음'] },
+        { status: 'good', score: 88, reasons: ['오후 중반, 무리 없음'] },
+        { status: 'good', score: 87, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 73, reasons: ['퇴근 직전이라 여유 부족 (회피 시간)'] },
+      ] },
+      // 이날은 외근이 없는 날 — 외근 관련 감점 없이 평범한 하루
+      chulsoo: { cells: [
+        { status: 'caution', score: 74, reasons: ['점심 직후라 약간 여유 부족'] },
+        { status: 'good', score: 88, reasons: ['외근 일정 없음'] },
+        { status: 'good', score: 90, reasons: ['업무 흐름상 무리 없음'] },
+        { status: 'caution', score: 76, reasons: ['연속 회의 가능성 있어 다소 빡빡'] },
+        { status: 'bad', score: 52, reasons: ['퇴근 직전, 회의 잡기 어려움'] },
+      ] },
+      jieun: { cells: [
+        { status: 'caution', score: 77, reasons: ['점심 직후라 약간 여유 부족'] },
+        { status: 'good', score: 92, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 94, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 89, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 76, reasons: ['퇴근 직전이라 살짝 촉박'] },
+      ] },
+      suhyun: { cells: [
+        { status: 'good', score: 88, reasons: ['점심 영향 적음'] },
+        { status: 'good', score: 93, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 95, reasons: ['선호 시간(오후)과 일치'] },
+        { status: 'good', score: 91, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'caution', score: 78, reasons: ['퇴근 직전이라 살짝 촉박'] },
+      ] },
+      daeun: { cells: [
+        { status: 'good', score: 90, reasons: ['점심 이후 이동 여유 확보됨'] },
+        { status: 'good', score: 92, reasons: ['연속 회의 없음'] },
+        { status: 'good', score: 93, reasons: ['이동시간 확보됨'] },
+        { status: 'caution', score: 79, reasons: ['다음 일정과 조금 근접'] },
+        { status: 'bad', score: 55, reasons: ['퇴근 직전, 연속 회의 부담'] },
+      ] },
     },
   },
   {
@@ -313,7 +379,7 @@ const SLOTS = [
     timeRange: '오전 11:00 – 12:00',
     scoreInput: {
       requiredCount: 3, requiredAvailable: 3,
-      totalCount: 6, availableCount: 5,
+      totalCount: 6, availableCount: 6,
       preferenceMatched: 3,
       context: { afterLunch: false, focusTime: true, afterBusinessTrip: false, backToBackMeeting: true },
       breakMinutes: 15,
@@ -322,30 +388,43 @@ const SLOTS = [
     columns: ['09:30', '10:00', '11:00', '12:00'],
     recommendedCol: '11:00',
     people: {
-      minsu: {
-        status: ['bad', 'bad', 'good', 'caution'], score: 82, tag: '추천', tagClass: 'great',
-        reasons: ['집중 업무 시간 직후 종료', '점심 전 여유 있음']
-      },
-      younghee: {
-        status: ['bad', 'caution', 'good', 'caution'], score: 80, tag: '추천', tagClass: 'great',
-        reasons: ['오전 선호 시간과 일치']
-      },
-      chulsoo: {
-        status: ['caution', 'caution', 'caution', 'bad'], score: 62, tag: '가능하지만 비추천', tagClass: 'caution',
-        reasons: ['월요일 오전 선호 회피 시간']
-      },
-      jieun: {
-        status: ['bad', 'bad', 'good', 'good'], score: 88, tag: '추천', tagClass: 'great',
-        reasons: ['외근 일정 없음']
-      },
-      suhyun: {
-        status: ['bad', 'caution', 'good', 'caution'], score: 79, tag: '가능하지만 비추천', tagClass: 'caution',
-        reasons: ['개인 선호 시간(오후)과 불일치']
-      },
-      daeun: {
-        status: ['caution', 'good', 'good', 'caution'], score: 85, tag: '추천', tagClass: 'great',
-        reasons: ['다음 일정까지 여유 있음']
-      },
+      minsu: { cells: [
+        { status: 'bad', score: 40, reasons: ['집중 업무 시간과 겹침'] },
+        { status: 'bad', score: 42, reasons: ['집중 업무 시간과 겹침'] },
+        { status: 'good', score: 89, reasons: ['집중 업무 시간 직후 종료'] },
+        { status: 'caution', score: 68, reasons: ['점심시간과 겹쳐 짧게만 가능'] },
+      ] },
+      younghee: { cells: [
+        { status: 'bad', score: 45, reasons: ['집중 업무 시간과 겹침'] },
+        { status: 'caution', score: 72, reasons: ['집중 업무 시간 막바지'] },
+        { status: 'good', score: 90, reasons: ['오전 선호 시간과 일치'] },
+        { status: 'caution', score: 70, reasons: ['점심시간 임박'] },
+      ] },
+      // 철수: 이날은 외근이 아니라 "오전 회피 시간대" 성향 때문에 오전 이른 시간대만 낮은 점수
+      chulsoo: { cells: [
+        { status: 'caution', score: 62, reasons: ['오전은 선호 회피 시간대'] },
+        { status: 'caution', score: 64, reasons: ['오전은 선호 회피 시간대'] },
+        { status: 'good', score: 85, reasons: ['선호 회피 시간대는 지나 무리 없이 참석 가능'] },
+        { status: 'bad', score: 40, reasons: ['점심시간과 겹침'] },
+      ] },
+      jieun: { cells: [
+        { status: 'bad', score: 48, reasons: ['이른 시간이라 준비 시간 부족'] },
+        { status: 'bad', score: 52, reasons: ['연속 회의로 이어질 가능성 높음'] },
+        { status: 'good', score: 91, reasons: ['외근 일정 없음'] },
+        { status: 'good', score: 86, reasons: ['점심 전 마지막 시간대, 여유 있음'] },
+      ] },
+      suhyun: { cells: [
+        { status: 'bad', score: 42, reasons: ['개인 선호 시간(오후)과 불일치'] },
+        { status: 'caution', score: 68, reasons: ['개인 선호 시간(오후)과 불일치'] },
+        { status: 'good', score: 86, reasons: ['선호 시간은 아니지만 무리 없이 참석 가능'] },
+        { status: 'caution', score: 71, reasons: ['점심시간 임박'] },
+      ] },
+      daeun: { cells: [
+        { status: 'caution', score: 74, reasons: ['이른 시간대라 다소 급함'] },
+        { status: 'good', score: 88, reasons: ['다음 일정까지 여유 있음'] },
+        { status: 'good', score: 90, reasons: ['업무 흐름상 무리 없음'] },
+        { status: 'caution', score: 72, reasons: ['점심시간 임박, 짧게만 가능'] },
+      ] },
     },
   },
 ];
@@ -413,7 +492,10 @@ function rankSlotsForPurpose(purposeId) {
     if (purpose.sortBySoonest && a.dateISO !== b.dateISO) {
       return a.dateISO < b.dateISO ? -1 : 1;
     }
-    return b.score - a.score;
+    if (b.score !== a.score) return b.score - a.score;
+    // 점수가 동점이면 더 이른 날짜를 우선한다 — 똑같이 좋은 시간이라면 굳이
+    // 미룰 이유가 없다는 원칙을 랭킹에 그대로 반영.
+    return a.dateISO < b.dateISO ? -1 : a.dateISO > b.dateISO ? 1 : 0;
   });
 
   return views.slice(0, 3);
@@ -477,6 +559,15 @@ const state = {
   activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
   profileSaved: false,       // 나의 회의 프로필에서 "저장하기"를 눌렀는지
+  profile: {
+    name: '나', team: '기획팀', photo: null, // 이름/소속팀/프로필 사진
+    workStart: '09:00', workEnd: '18:00',
+    lunchStart: '12:00', lunchEnd: '13:00',
+    focusStart: '09:00', focusEnd: '11:00',
+    prefTime: 'pm',
+    avoidAfterLunch: true, avoidBeforeEod: true, avoidMondayAm: true, avoidFridayPm: false,
+    bufferEnabled: true, bufferMinutes: '15분',
+  }, // 나의 회의 프로필 — "저장하기"를 눌러야 커밋됨
   pendingMeetings: [],       // 필참자에게 제안했지만 아직 확정되지 않은 회의 (홈 화면에 노출)
   activePendingId: null,     // 지금 의견수집/합의 화면에서 다루고 있는 pendingMeetings 항목의 id
 };
@@ -811,7 +902,7 @@ function renderAltSlots() {
   }).join('');
 
   state.currentRecommendations.slice(1).forEach(slot => {
-    mountEvidence(`alt-${slot.id}`, slot);
+    mountEvidence(`alt-${slot.id}`, slot, state.selectedAttendeeIds);
     const header = wrap.querySelector(`.alt-card[data-toggle-slot="${slot.id}"]`);
     const panel = document.getElementById(`alt-${slot.id}-evidence`);
     header.addEventListener('click', () => toggleEvidencePanel(panel, header));
@@ -860,7 +951,7 @@ document.getElementById('find-time-btn').addEventListener('click', () => {
     document.getElementById('loading-wrap').style.display = 'none';
     document.getElementById('meeting-results').style.display = 'block';
     renderHeroCard(state.currentRecommendations[0]);
-    mountEvidence('hero', state.currentRecommendations[0]);
+    mountEvidence('hero', state.currentRecommendations[0], state.selectedAttendeeIds);
     renderAltSlots();
   }, 900);
 });
@@ -1061,61 +1152,20 @@ function showScreen(name) {
 
 document.querySelectorAll('[data-nav]').forEach(btn => {
   btn.addEventListener('click', () => showScreen(btn.dataset.nav));
+  if (btn.tagName !== 'BUTTON') {
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        showScreen(btn.dataset.nav);
+      }
+    });
+  }
 });
 
 // ============================================================================
 // Screen 01 — calendar integration (replaces manual schedule entry)
 // ============================================================================
 let calendarConnected = false;
-
-// Mock data as if imported from the connected Google Calendar.
-const syncedSchedule = {
-  recurring: [
-    { id: 'r1', title: '외근',   weekday: '화', start: '10:00', end: '17:00', enabled: true },
-    { id: 'r2', title: '팀회의', weekday: '목', start: '14:00', end: '15:00', enabled: true },
-    { id: 'r3', title: '교육',   weekday: '금', start: '09:00', end: '12:00', enabled: true },
-  ],
-  oneTime: [
-    { id: 'o1', title: '병원 예약', date: '2026-07-10', start: '14:00', end: '15:00', enabled: true },
-  ],
-};
-
-function renderSyncedSchedule() {
-  const list = document.getElementById('synced-schedule-list');
-  const items = [
-    ...syncedSchedule.recurring.map(s => ({ ...s, kind: 'recurring' })),
-    ...syncedSchedule.oneTime.map(s => ({ ...s, kind: 'onetime' })),
-  ];
-
-  if (items.length === 0) {
-    list.innerHTML = `
-      <li class="list-empty">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/></svg>
-        <span>가져온 일정이 없어요</span>
-      </li>`;
-    return;
-  }
-
-  list.innerHTML = items.map(s => {
-    const label = s.kind === 'recurring' ? `매주 ${s.weekday}요일 ${s.title}` : `${resolveDayLabel(s.date)} ${s.title}`;
-    return `
-    <div class="check-item repeat-item synced-item">
-      <input type="checkbox" id="sync-${s.id}" ${s.enabled ? 'checked' : ''}>
-      <label for="sync-${s.id}">${label}<span class="meta">${s.start} – ${s.end}</span></label>
-      <span class="synced-tag" title="Google 캘린더에서 가져옴">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </span>
-    </div>`;
-  }).join('');
-
-  list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const id = cb.id.replace('sync-', '');
-      const item = syncedSchedule.recurring.find(s => s.id === id) || syncedSchedule.oneTime.find(s => s.id === id);
-      if (item) item.enabled = cb.checked;
-    });
-  });
-}
 
 document.getElementById('connect-calendar-btn').addEventListener('click', () => {
   document.getElementById('calendar-disconnected-state').style.display = 'none';
@@ -1126,8 +1176,6 @@ document.getElementById('connect-calendar-btn').addEventListener('click', () => 
     document.getElementById('calendar-connecting-state').style.display = 'none';
     document.getElementById('calendar-connected-state').style.display = 'block';
     document.getElementById('calendar-sync-time').textContent = '방금 동기화됨';
-    document.getElementById('synced-schedule-card').style.display = 'block';
-    renderSyncedSchedule();
     showToast('구글 캘린더가 연동됐어요.');
     updateSetupBanner();
   }, 900);
@@ -1136,16 +1184,83 @@ document.getElementById('connect-calendar-btn').addEventListener('click', () => 
 document.getElementById('disconnect-calendar-btn').addEventListener('click', () => {
   calendarConnected = false;
   document.getElementById('calendar-connected-state').style.display = 'none';
-  document.getElementById('synced-schedule-card').style.display = 'none';
   document.getElementById('calendar-disconnected-state').style.display = 'block';
   showToast('캘린더 연동이 해제됐어요.');
   updateSetupBanner();
 });
 
 // ============================================================================
+// Screen 01 — profile photo
+// ============================================================================
+let profilePhotoDraft = state.profile.photo;
+
+function applyAvatarVisual(el, initial, photoUrl) {
+  if (photoUrl) {
+    el.style.backgroundImage = `url("${photoUrl}")`;
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = initial;
+  }
+}
+
+document.getElementById('profile-photo-btn').addEventListener('click', () => {
+  document.getElementById('profile-photo-input').click();
+});
+
+document.getElementById('profile-photo-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('이미지 파일만 등록할 수 있어요.');
+    e.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    profilePhotoDraft = reader.result;
+    const name = document.getElementById('profile-name-input').value.trim() || '나';
+    applyAvatarVisual(document.getElementById('profile-avatar-preview'), name[0].toUpperCase(), profilePhotoDraft);
+    document.getElementById('profile-photo-remove-btn').style.display = 'inline-flex';
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('profile-photo-remove-btn').addEventListener('click', () => {
+  profilePhotoDraft = null;
+  document.getElementById('profile-photo-input').value = '';
+  const name = document.getElementById('profile-name-input').value.trim() || '나';
+  applyAvatarVisual(document.getElementById('profile-avatar-preview'), name[0].toUpperCase(), null);
+  document.getElementById('profile-photo-remove-btn').style.display = 'none';
+});
+
+// ============================================================================
 // Screen 01 — profile save
 // ============================================================================
 document.getElementById('save-profile-btn').addEventListener('click', () => {
+  const name = document.getElementById('profile-name-input').value.trim() || '나';
+  state.profile.name = name;
+  state.profile.team = document.getElementById('profile-team-input').value;
+  state.profile.photo = profilePhotoDraft;
+
+  state.profile.workStart = document.getElementById('work-start-input').value;
+  state.profile.workEnd = document.getElementById('work-end-input').value;
+  state.profile.lunchStart = document.getElementById('lunch-start-input').value;
+  state.profile.lunchEnd = document.getElementById('lunch-end-input').value;
+  state.profile.focusStart = document.getElementById('focus-start-input').value;
+  state.profile.focusEnd = document.getElementById('focus-end-input').value;
+  state.profile.prefTime = document.querySelector('input[name="pref-time"]:checked').value;
+  state.profile.avoidAfterLunch = document.getElementById('avoid-after-lunch-input').checked;
+  state.profile.avoidBeforeEod = document.getElementById('avoid-before-eod-input').checked;
+  state.profile.avoidMondayAm = document.getElementById('avoid-monday-am-input').checked;
+  state.profile.avoidFridayPm = document.getElementById('avoid-friday-pm-input').checked;
+  state.profile.bufferEnabled = document.getElementById('buffer-toggle').checked;
+  state.profile.bufferMinutes = document.getElementById('buffer-minutes').value;
+
+  document.querySelector('.user-name').textContent = name;
+  applyAvatarVisual(document.querySelector('.user-avatar'), name[0].toUpperCase(), profilePhotoDraft);
+
   state.profileSaved = true;
   showToast('저장했어요. 이후 회의 추천에 자동으로 반영돼요.');
   updateSetupBanner();
@@ -1169,8 +1284,8 @@ document.getElementById('home-setup-banner-btn').addEventListener('click', () =>
 // ============================================================================
 function deriveAttendeeLeaning(personId, slot) {
   const idx = slot.columns.indexOf(slot.recommendedCol);
-  const status = slot.people[personId] && slot.people[personId].status[idx];
-  return status !== 'bad';
+  const cell = slot.people[personId] && slot.people[personId].cells[idx];
+  return !cell || cell.status !== 'bad';
 }
 
 function isPersonResponded(personId) {
@@ -1443,7 +1558,7 @@ function renderConsensusScreen() {
   document.getElementById('consensus-attendance').textContent = `${top.availableCount} / ${top.requiredTotal}`;
   document.getElementById('consensus-reasons').innerHTML = buildConsensusReasons(top, state.purpose)
     .map(r => `<li class="reason-item">${r}</li>`).join('');
-  mountEvidence('consensus', top.slot);
+  mountEvidence('consensus', top.slot, [...state.requiredIds, ...state.optionalIds]);
 
   document.getElementById('consensus-candidate-list').innerHTML = consensus.map((entry, i) => {
     const statusText = entry.requiredTotal === 0
@@ -1556,7 +1671,7 @@ function renderDetail(booking) {
     document.getElementById('detail-desc').textContent = slot.summary.message;
 
     document.getElementById('criteria-list').innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
-    mountHeatmap(document.getElementById('heatmap'), slot);
+    mountHeatmap(document.getElementById('heatmap'), slot, booking.attendeeIds);
   }
 }
 
@@ -1709,7 +1824,9 @@ document.getElementById('detail-evidence-toggle').addEventListener('click', func
   toggleEvidencePanel(document.getElementById('detail-evidence-panel'), this);
 });
 
-function buildHeatmapHtml(slot) {
+// attendeeIds — 이번 회의에 실제로 추가된 참석자만 히트맵에 보여준다. 회의와 무관한
+// 나머지 동료까지 노출되면 "참석자별 회의 적합도"라는 카드 제목과 어긋나기 때문.
+function buildHeatmapHtml(slot, attendeeIds) {
   let html = `<div></div>`; // top-left empty corner
   slot.columns.forEach(col => {
     const isRec = col === slot.recommendedCol;
@@ -1720,15 +1837,15 @@ function buildHeatmapHtml(slot) {
       </div>`;
   });
 
-  ATTENDEES.forEach(person => {
+  attendeeIds.map(id => ATTENDEES.find(a => a.id === id)).forEach(person => {
     html += `<div class="heatmap-row-label"><span class="avatar">${person.name[0]}</span>${person.name}</div>`;
     const p = slot.people[person.id];
     slot.columns.forEach((col, i) => {
-      const status = p.status[i];
+      const status = p.cells[i].status;
       const isRec = col === slot.recommendedCol;
       html += `
         <button type="button" class="heatmap-cell ${status} ${isRec ? 'recommended-col' : ''}"
-          data-person="${person.id}" data-slot="${slot.id}" aria-label="${person.name} ${col} ${statusLabel(status)}">
+          data-person="${person.id}" data-slot="${slot.id}" data-col="${i}" aria-label="${person.name} ${col} ${statusLabel(status)}">
           <span class="dot"></span>
         </button>`;
     });
@@ -1736,19 +1853,19 @@ function buildHeatmapHtml(slot) {
   return html;
 }
 
-function mountHeatmap(container, slot) {
+function mountHeatmap(container, slot, attendeeIds) {
   container.style.setProperty('--cols', slot.columns.length);
-  container.innerHTML = buildHeatmapHtml(slot);
+  container.innerHTML = buildHeatmapHtml(slot, attendeeIds);
   container.querySelectorAll('.heatmap-cell').forEach(cell => {
-    cell.addEventListener('click', () => openPersonSheet(cell.dataset.person, Number(cell.dataset.slot)));
+    cell.addEventListener('click', () => openPersonSheet(cell.dataset.person, Number(cell.dataset.slot), Number(cell.dataset.col)));
   });
 }
 
 // Fills the criteria + heatmap for an inline accordion, given an id prefix
 // (e.g. 'hero' or 'alt-2') matching '#{prefix}-criteria' / '#{prefix}-heatmap'.
-function mountEvidence(prefix, slot) {
+function mountEvidence(prefix, slot, attendeeIds) {
   document.getElementById(`${prefix}-criteria`).innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
-  mountHeatmap(document.getElementById(`${prefix}-heatmap`), slot);
+  mountHeatmap(document.getElementById(`${prefix}-heatmap`), slot, attendeeIds);
 }
 
 function toggleEvidencePanel(panel, toggleEl) {
@@ -1770,19 +1887,21 @@ function statusLabel(status) {
 // ============================================================================
 // Person detail sheet
 // ============================================================================
-function openPersonSheet(personId, slotId) {
+function openPersonSheet(personId, slotId, colIndex) {
   const slot = SLOTS.find(s => s.id === slotId);
   const person = ATTENDEES.find(a => a.id === personId);
-  const data = slot.people[personId];
+  const cell = slot.people[personId].cells[colIndex];
+  const meta = HEATMAP_STATUS_META[cell.status];
 
   document.getElementById('sheet-avatar').textContent = person.name[0];
   document.getElementById('sheet-name').textContent = person.name;
   document.getElementById('sheet-team').textContent = person.team;
-  document.getElementById('sheet-score').textContent = data.score;
+  document.getElementById('sheet-time').textContent = slot.columns[colIndex];
+  document.getElementById('sheet-score').textContent = cell.score;
   const tag = document.getElementById('sheet-tag');
-  tag.textContent = data.tag;
-  tag.className = `score-label score-label--${data.tagClass}`;
-  document.getElementById('sheet-reasons').innerHTML = data.reasons.map(r => `<div class="sheet-reason">${r}</div>`).join('');
+  tag.textContent = meta.tag;
+  tag.className = `score-label score-label--${meta.tagClass}`;
+  document.getElementById('sheet-reasons').innerHTML = cell.reasons.map(r => `<div class="sheet-reason">${r}</div>`).join('');
 
   document.getElementById('sheet-overlay').classList.add('open');
 }
@@ -1853,11 +1972,15 @@ document.getElementById('detail-back-btn').addEventListener('click', () => {
   showScreen('home');
 });
 
-// Reschedule: drop the current booking but carry its attendees + purpose into a fresh search.
+// Reschedule: drop the current booking but carry its title/location/attendees/purpose into a fresh search.
 document.getElementById('detail-reschedule-btn').addEventListener('click', () => {
   const booking = state.activeBooking;
   state.bookings = state.bookings.filter(b => b.id !== booking.id);
   resetCreateFlow();
+  state.meetingTitle = booking.title;
+  document.getElementById('meeting-title-input').value = booking.title;
+  state.meetingLocation = booking.location || '';
+  document.getElementById('meeting-location-input').value = booking.location || '';
   state.selectedAttendeeIds = [...booking.attendeeIds];
   state.purpose = booking.purpose.id;
   booking.attendeeIds.forEach(id => {
@@ -1866,7 +1989,7 @@ document.getElementById('detail-reschedule-btn').addEventListener('click', () =>
   renderPurposeOptions();
   renderAttendeeList();
   renderHome();
-  showToast('참석자와 회의 목적은 그대로 뒀어요. 새 시간을 찾아보세요.');
+  showToast('제목·참석자·회의 목적은 그대로 뒀어요. 새 시간을 찾아보세요.');
   showScreen('create');
 });
 
@@ -2126,9 +2249,11 @@ function completeLogin({ name, email } = {}) {
   document.getElementById('app-shell').style.display = '';
 
   const displayName = name || (email ? email.split('@')[0] : '나');
+  state.profile.name = displayName;
   document.querySelector('.user-name').textContent = displayName;
   if (email) document.querySelector('.user-email').textContent = email;
   document.querySelector('.user-avatar').textContent = displayName[0].toUpperCase();
+  document.getElementById('profile-name-input').value = displayName;
 
   showToast('로그인됐어요.');
 }
@@ -2175,6 +2300,23 @@ function bindMobileDatePicker(input) {
 // ============================================================================
 // Init
 // ============================================================================
+document.getElementById('profile-name-input').value = state.profile.name;
+document.getElementById('profile-team-input').value = state.profile.team;
+applyAvatarVisual(document.getElementById('profile-avatar-preview'), state.profile.name[0].toUpperCase(), profilePhotoDraft);
+document.getElementById('profile-photo-remove-btn').style.display = profilePhotoDraft ? 'inline-flex' : 'none';
+document.getElementById('work-start-input').value = state.profile.workStart;
+document.getElementById('work-end-input').value = state.profile.workEnd;
+document.getElementById('lunch-start-input').value = state.profile.lunchStart;
+document.getElementById('lunch-end-input').value = state.profile.lunchEnd;
+document.getElementById('focus-start-input').value = state.profile.focusStart;
+document.getElementById('focus-end-input').value = state.profile.focusEnd;
+document.querySelector(`input[name="pref-time"][value="${state.profile.prefTime}"]`).checked = true;
+document.getElementById('avoid-after-lunch-input').checked = state.profile.avoidAfterLunch;
+document.getElementById('avoid-before-eod-input').checked = state.profile.avoidBeforeEod;
+document.getElementById('avoid-monday-am-input').checked = state.profile.avoidMondayAm;
+document.getElementById('avoid-friday-pm-input').checked = state.profile.avoidFridayPm;
+document.getElementById('buffer-toggle').checked = state.profile.bufferEnabled;
+document.getElementById('buffer-minutes').value = state.profile.bufferMinutes;
 document.getElementById('meeting-date-input').min = toISODate(new Date());
 document.getElementById('period-start-input').min = toISODate(new Date());
 document.getElementById('period-end-input').min = toISODate(new Date());
