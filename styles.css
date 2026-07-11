@@ -690,40 +690,6 @@ select:focus-visible,
   background: var(--color-bg-secondary);
 }
 
-/* Stepper: 추천 → 검증 → 예약 */
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  width: fit-content;
-  font-size: 13px;
-}
-
-.stepper-step {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-tertiary);
-  font-weight: 600;
-  transition: background var(--dur-base), color var(--dur-base);
-}
-
-.stepper-step.current {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.stepper-arrow {
-  color: var(--color-text-disabled);
-}
-
 /* ==========================================================================
    Cards
    ========================================================================== */
@@ -1692,28 +1658,17 @@ select.minute-select {
   margin-bottom: var(--space-4);
 }
 
-.booking-summary-attendees {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.avatar-stack-lg .avatar {
-  width: 40px;
-  height: 40px;
-  font-size: 15px;
-  margin-left: -12px;
-  border: 2px solid var(--color-bg-secondary);
-}
-
-.avatar-stack-lg .avatar:first-child {
-  margin-left: 0;
-}
-
-.booking-summary-names {
-  font-size: 16px;
+.booking-summary-location {
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text-secondary);
+  margin: 0 0 var(--space-4);
+}
+
+.booking-summary-attendees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .detail-score-row {
@@ -1997,6 +1952,32 @@ select.minute-select {
   margin: 0 auto var(--space-4);
 }
 
+/* 참석자 추가 시트 — 직원이 많아 목록이 길어져도 "추가하기" 버튼은 하단에 항상 보이게
+   고정하고, 목록만 그 안에서 스크롤되게 한다. */
+#picker-overlay .bottom-sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#picker-overlay .sheet-handle,
+#picker-overlay #picker-title,
+#picker-overlay .search-field,
+#picker-overlay .picker-select-all {
+  flex-shrink: 0;
+}
+
+#picker-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+#picker-confirm-btn {
+  flex-shrink: 0;
+  margin-top: var(--space-4);
+}
+
 .sheet-close {
   position: absolute;
   top: var(--space-4);
@@ -2123,16 +2104,15 @@ select.minute-select {
   }
 }
 
-/* 제안 응답 모달 — 다른 시트들과 달리 화면 크기와 무관하게 항상 중앙 모달로 뜬다 */
+/* 제안/선택 참석 응답 모달 — 모바일에서는 바텀시트, 태블릿 이상에서는 중앙 모달로 뜬다 */
 .respond-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   display: none;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   z-index: 100;
-  padding: var(--space-4);
   opacity: 0;
   transition: opacity var(--dur-base) var(--ease-out);
 }
@@ -2145,19 +2125,42 @@ select.minute-select {
 .respond-modal {
   position: relative;
   background: var(--color-surface);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   width: 100%;
   max-width: 480px;
   max-height: 85dvh;
   overflow-y: auto;
-  padding: var(--space-6);
+  padding: var(--space-3) var(--space-6) var(--space-8);
   box-shadow: var(--shadow-lg);
-  transform: scale(0.96) translateY(8px);
-  transition: transform var(--dur-base) var(--ease-out);
+  transform: translateY(100%);
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 .respond-modal-overlay.open .respond-modal {
-  transform: scale(1) translateY(0);
+  transform: translateY(0);
+}
+
+/* 900px 이상(태블릿/데스크탑)부터 모달 — 사이드바/탑바가 바뀌는 기준과 동일하게 맞춘다. */
+@media (min-width: 901px) {
+  .respond-modal-overlay {
+    align-items: center;
+    padding: var(--space-4);
+  }
+
+  .respond-modal {
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transform: scale(0.96) translateY(8px);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+
+  .respond-modal-overlay.open .respond-modal {
+    transform: scale(1) translateY(0);
+  }
+
+  .respond-modal .sheet-handle {
+    display: none;
+  }
 }
 
 /* Confirmation dialog (destructive actions) */
@@ -2531,6 +2534,11 @@ select.minute-select {
   color: var(--color-warning-text);
 }
 
+.status-chip--complete {
+  box-shadow: 0 0 0 1px var(--color-success-text) inset;
+  animation: badgePop 420ms var(--ease-out);
+}
+
 /* ==========================================================================
    Screen 04 — MeetFit 합의 결과
    ========================================================================== */
@@ -2840,6 +2848,14 @@ select.minute-select {
     font-size: 44px;
   }
 
+  /* 날짜 입력 — 모바일에서는 캘린더 아이콘을 없애고, 날짜 영역 전체를 탭하면
+     네이티브 캘린더가 뜨도록 한다 (아이콘을 숨겨도 입력창 전체가 탭 타겟이라
+     동작은 그대로 유지된다). */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+  }
+
   /* 참석자 행 — 모바일에서는 체크박스, 데스크톱/태블릿에서는 토글 버튼 */
   .required-toggle {
     display: none;
@@ -2878,9 +2894,5 @@ select.minute-select {
 
   .booking-summary-time {
     font-size: 24px;
-  }
-
-  .stepper {
-    font-size: 12px;
   }
 }

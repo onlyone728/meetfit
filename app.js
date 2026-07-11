@@ -351,22 +351,34 @@ const SLOTS = [
 ];
 
 const PAST_MEETINGS = [
-  { title: '신규 기능 디자인 리뷰', dateLabel: '어제 오후 3:00 – 4:00', attendeeIds: ['minsu', 'younghee', 'chulsoo'] },
-  { title: '7월 마케팅 캠페인 킥오프', dateLabel: '7월 3일 오전 11:00 – 12:00', attendeeIds: ['jieun', 'suhyun', 'daeun', 'minsu'] },
+  { title: '신규 기능 디자인 리뷰', dateLabel: '어제 오후 3:00 – 4:00', attendeeIds: ['minsu', 'younghee', 'chulsoo'], location: '5층 회의실 B' },
+  { title: '7월 마케팅 캠페인 킥오프', dateLabel: '7월 3일 오전 11:00 – 12:00', attendeeIds: ['jieun', 'suhyun', 'daeun', 'minsu'], location: '온라인(Zoom)' },
 ];
 
 // 홈 화면 "나에게 온 제안" 더미 데이터 — 다른 사람이 나를 필참자로 초대했다고 가정한
 // 시나리오. 이 프로토타입은 로그인 사용자가 한 명뿐이라 실제 발신자는 없고, 응답
-// 화면(제목 → 참석자 → 후보 시간 → 제출)을 미리 확인해볼 수 있도록 넣어둔 예시다.
+// 화면(주제 → 참석자 → 후보 시간 → 제출)을 미리 확인해볼 수 있도록 넣어둔 예시다.
 const INCOMING_INVITE = {
   organizerId: 'jieun',
   title: '주간 마케팅 싱크',
   candidateLabels: ['수요일 오전 10:00 – 11:00', '목요일 오후 2:00 – 3:00', '금요일 오전 11:00 – 12:00'],
   participantIds: ['jieun', 'minsu', 'suhyun'],
+  location: '2층 회의실 C',
 };
 
-// 회의 상세의 "회의 생성 히스토리" 타임라인에 쓰이는 4단계 — 스테퍼(.stepper-step)의
-// data-step 값과 짝을 맞춘다.
+// 홈 화면 "나에게 온 제안" 두 번째 시나리오 — 다른 사람이 나를 "선택 참석자"로 초대한
+// 경우. 필참자와 달리 후보 시간을 고르는 게 아니라, 이미 확정된 시간에 참석 가능
+// 여부만 답하면 된다 (선택 참석자는 시간 결정에 관여하지 않는다는 서비스 원칙).
+const INCOMING_OPTIONAL_INVITE = {
+  organizerId: 'chulsoo',
+  title: '분기 회고 세션',
+  timeLabel: '다음 주 화요일 오후 4:00 – 5:00',
+  requiredIds: ['chulsoo', 'jieun', 'daeun'],
+  purposeId: 'gather',
+  location: '4층 라운지',
+};
+
+// 회의 상세의 "회의 생성 히스토리" 타임라인에 쓰이는 4단계.
 const HISTORY_STEPS = [
   { id: 'recommend', label: '추천 완료' },
   { id: 'collect', label: '필참 의견 수집' },
@@ -446,7 +458,8 @@ function buildExclusionReasons(slot) {
 const state = {
   selectedAttendeeIds: [],   // ids currently added to the meeting being created
   attendance: {},            // id -> true(필참) / false(선택 참석)
-  meetingTitle: '',          // 회의 제목 (선택 입력)
+  meetingTitle: '',          // 회의 주제 (필수 입력)
+  meetingLocation: '',       // 회의 장소 (선택 입력)
   purpose: null,              // 선택된 회의 목적 id (MEETING_PURPOSES)
   meetingDate: '',           // ISO date (YYYY-MM-DD) currently selected on Screen 02 (특정 날짜 지정 모드)
   searchMode: 'period',      // 'period'(기간으로 찾기) | 'specific'(특정 날짜 지정)
@@ -457,9 +470,9 @@ const state = {
   optionalIds: [],           // 이번 회의의 선택 참석자 id
   responses: {},             // { [slotId]: { [attendeeId]: true|false } } — 필참자 의견 수집 상태
   respondDeadlineLabel: '오늘 오후 5시',
-  activeRespondPersonId: null,
-  activeRespondConfig: null, // 지금 열려있는 응답 시트가 무엇에 대한 것인지(제목/참석자/후보/제출 콜백)
+  activeRespondConfig: null, // 지금 열려있는 응답 시트가 무엇에 대한 것인지(주제/참석자/후보/제출 콜백)
   incomingInviteResponse: null, // 홈의 "나에게 온 제안" 더미 초대에 대한 내 응답 — null이면 아직 미응답
+  incomingOptionalInviteResponse: null, // 홈의 "나에게 온 제안(선택 참석)" 더미 초대에 대한 내 응답
   consensusResult: [],       // computeConsensus() 결과 — 회의 확정 시 참고
   activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
@@ -633,7 +646,7 @@ function syncAttendeeControls() {
   findBtn.disabled = blocked;
   hint.style.display = blocked ? 'block' : 'none';
   hint.textContent = !hasTitle
-    ? '회의 제목을 입력하면 좋은 시간을 찾아드려요.'
+    ? '회의 주제를 입력하면 좋은 시간을 찾아드려요.'
     : count === 0
       ? '참석자를 1명 이상 추가하면 좋은 시간을 찾아드려요.'
       : '회의 목적을 선택하면 좋은 시간을 찾아드려요.';
@@ -842,7 +855,6 @@ document.getElementById('find-time-btn').addEventListener('click', () => {
   if (!state.meetingTitle.trim() || state.selectedAttendeeIds.length === 0 || !state.purpose) return;
   document.getElementById('meeting-form').style.display = 'none';
   document.getElementById('loading-wrap').style.display = 'flex';
-  setStepper('recommend', 'create');
   setTimeout(() => {
     state.currentRecommendations = rankSlotsForPurpose(state.purpose);
     document.getElementById('loading-wrap').style.display = 'none';
@@ -873,6 +885,7 @@ document.getElementById('propose-btn').addEventListener('click', () => {
   const pendingEntry = {
     id: Date.now(),
     title: state.meetingTitle.trim(),
+    location: state.meetingLocation.trim(),
     purposeId: state.purpose,
     requiredIds: [...state.requiredIds],
     optionalIds: [...state.optionalIds],
@@ -885,7 +898,6 @@ document.getElementById('propose-btn').addEventListener('click', () => {
   renderHome();
 
   renderCollectScreen();
-  setStepper('collect', 'collect');
   showScreen('collect');
 });
 
@@ -895,13 +907,13 @@ function resumePendingMeeting(id) {
   if (!entry) return;
   state.activePendingId = entry.id;
   state.meetingTitle = entry.title;
+  state.meetingLocation = entry.location || '';
   state.purpose = entry.purposeId;
   state.requiredIds = entry.requiredIds;
   state.optionalIds = entry.optionalIds;
   state.currentRecommendations = entry.candidates;
   state.responses = entry.responses;
   renderCollectScreen();
-  setStepper('collect', 'collect');
   showScreen('collect');
 }
 
@@ -925,6 +937,10 @@ document.getElementById('meeting-date-input').addEventListener('change', (e) => 
 document.getElementById('meeting-title-input').addEventListener('input', (e) => {
   state.meetingTitle = e.target.value;
   syncAttendeeControls();
+});
+
+document.getElementById('meeting-location-input').addEventListener('input', (e) => {
+  state.meetingLocation = e.target.value;
 });
 
 // ============================================================================
@@ -1001,6 +1017,8 @@ function resetCreateFlow() {
   state.attendance = {};
   state.meetingTitle = '';
   document.getElementById('meeting-title-input').value = '';
+  state.meetingLocation = '';
+  document.getElementById('meeting-location-input').value = '';
   state.purpose = null;
   state.currentRecommendations = [];
   state.requiredIds = [];
@@ -1016,7 +1034,6 @@ function resetCreateFlow() {
   document.getElementById('loading-wrap').style.display = 'none';
   document.getElementById('meeting-form').style.display = 'block';
   renderPurposeOptions();
-  setStepper('recommend', 'create');
   renderAttendeeList();
 
   const heroToggle = document.getElementById('hero-evidence-toggle');
@@ -1030,17 +1047,6 @@ document.getElementById('new-meeting-btn').addEventListener('click', () => {
   resetCreateFlow();
   showScreen('create');
 });
-
-// ============================================================================
-// Stepper (4단계: 추천 → 의견수집 → 합의 → 확정) — screen-create/collect/consensus
-// 각 화면의 .stepper-step 중 현재 단계에만 .current를 준다.
-// ============================================================================
-function setStepper(step, screenId) {
-  const scope = screenId ? document.getElementById(`screen-${screenId}`) : document;
-  scope.querySelectorAll('.stepper-step').forEach(el => {
-    el.classList.toggle('current', el.dataset.step === step);
-  });
-}
 
 // ============================================================================
 // Screen navigation
@@ -1215,6 +1221,12 @@ function renderCollectScreen() {
   listWrap.querySelectorAll('.responder-row').forEach(row => {
     row.addEventListener('click', () => openRespondSheetForPerson(row.dataset.person));
   });
+
+  // 응답이 하나라도 들어온 뒤에는 제안을 수정할 수 없다 — 이미 받은 응답이 무효화되기 때문.
+  // 그 경우엔 취소만 가능하다.
+  const editBtn = document.getElementById('collect-edit-btn');
+  editBtn.disabled = respondedCount > 0;
+  document.getElementById('collect-edit-hint').style.display = respondedCount > 0 ? 'block' : 'none';
 }
 
 document.getElementById('collect-remind-btn').addEventListener('click', () => {
@@ -1223,13 +1235,52 @@ document.getElementById('collect-remind-btn').addEventListener('click', () => {
 
 document.getElementById('collect-done-btn').addEventListener('click', () => {
   renderConsensusScreen();
-  setStepper('consensus', 'consensus');
   showScreen('consensus');
+});
+
+// 제안 수정하기 — 아직 아무도 응답하지 않았을 때만 가능. 기존 제안을 지우고
+// 회의 만들기 화면에 제목/목적/참석자를 그대로 채워서 다시 다듬을 수 있게 한다.
+document.getElementById('collect-edit-btn').addEventListener('click', () => {
+  const entry = state.pendingMeetings.find(p => p.id === state.activePendingId);
+  if (!entry) return;
+
+  state.pendingMeetings = state.pendingMeetings.filter(p => p.id !== entry.id);
+  resetCreateFlow();
+  state.meetingTitle = entry.title;
+  document.getElementById('meeting-title-input').value = entry.title;
+  state.meetingLocation = entry.location || '';
+  document.getElementById('meeting-location-input').value = entry.location || '';
+  state.purpose = entry.purposeId;
+  state.selectedAttendeeIds = [...entry.requiredIds, ...entry.optionalIds];
+  entry.requiredIds.forEach(id => { state.attendance[id] = true; });
+  entry.optionalIds.forEach(id => { state.attendance[id] = false; });
+  renderPurposeOptions();
+  renderAttendeeList();
+  renderHome();
+  showToast('제안을 수정할 수 있어요. 내용을 바꾸고 다시 제안해보세요.');
+  showScreen('create');
+});
+
+// 제안 취소하기 — 언제든 가능하지만 되돌릴 수 없어서 확인을 거친다.
+document.getElementById('collect-cancel-btn').addEventListener('click', () => {
+  const id = state.activePendingId;
+  openConfirmDialog({
+    title: '제안을 취소할까요?',
+    desc: '취소하면 필참자에게 보낸 제안과 지금까지 모인 응답이 모두 사라져요.',
+    confirmLabel: '제안 취소하기',
+    action: () => {
+      state.pendingMeetings = state.pendingMeetings.filter(p => p.id !== id);
+      resetCreateFlow();
+      showToast('제안이 취소됐어요.');
+      renderHome();
+      showScreen('home');
+    },
+  });
 });
 
 // ---- 응답 시뮬레이션 바텀시트 ----
 // 두 군데에서 재사용한다: (1) 조직자가 의견 수집 화면에서 특정 필참자 입장을 시뮬레이션할 때,
-// (2) 홈 화면 "나에게 온 제안"에 내가 직접 응답할 때. 항상 회의 제목 → 참석자 → 후보 시간
+// (2) 홈 화면 "나에게 온 제안"에 내가 직접 응답할 때. 항상 회의 주제 → 참석자 → 후보 시간
 // → 제출 순서로 보여준다.
 function openRespondSheetForPerson(personId) {
   const person = ATTENDEES.find(a => a.id === personId);
@@ -1243,7 +1294,7 @@ function openRespondSheetForPerson(personId) {
 
   openRespondSheet({
     heading: `${person.name}님으로 응답해보기 (데모)`,
-    meetingTitle: state.meetingTitle.trim() || '(제목 없는 회의)',
+    meetingTitle: state.meetingTitle.trim() || '(주제 없는 회의)',
     participants: participantIds.map(id => ATTENDEES.find(a => a.id === id)),
     candidateLabels: candidates.map(slot => buildSlotLabel(slot)),
     checked,
@@ -1255,6 +1306,7 @@ function openRespondSheetForPerson(personId) {
       });
       showToast(`${person.name}님이 응답했어요.`);
       renderCollectScreen();
+      renderHome(); // 홈의 "제안 중인 회의" 카운트도 지금 바로 반영 — 다음에 홈에 갈 때까지 기다리지 않는다.
     },
   });
 }
@@ -1435,10 +1487,8 @@ document.getElementById('consensus-confirm-btn').addEventListener('click', funct
 // ============================================================================
 function buildAttendeeSummaryHtml(attendeeIds) {
   const people = attendeeIds.map(id => ATTENDEES.find(a => a.id === id));
-  const avatars = people.map(p => `<span class="avatar">${p.name[0]}</span>`).join('');
-  return `
-    <div class="avatar-stack avatar-stack-lg">${avatars}</div>
-    <span class="booking-summary-names">${people.map(p => p.name).join(', ')}</span>`;
+  return people.map(p => `
+    <span class="respond-attendee-chip"><span class="avatar">${p.name[0]}</span>${p.name}</span>`).join('');
 }
 
 function renderDetail(booking) {
@@ -1450,6 +1500,9 @@ function renderDetail(booking) {
   titleEl.style.display = booking.title ? 'block' : 'none';
 
   document.getElementById('detail-time').textContent = booking.label;
+  const locationEl = document.getElementById('detail-location');
+  locationEl.textContent = booking.location ? `📍 ${booking.location}` : '';
+  locationEl.style.display = booking.location ? 'block' : 'none';
   document.getElementById('detail-purpose-chip').textContent = booking.purpose.label;
   document.getElementById('detail-attendees').innerHTML = buildAttendeeSummaryHtml(booking.attendeeIds);
 
@@ -1461,41 +1514,79 @@ function renderDetail(booking) {
 
   renderOptionalList(booking);
 
-  document.getElementById('detail-reason-text').textContent =
-    `이번 회의는 ${booking.purpose.emphasis}과 필참자의 합의를 가장 우선하여 추천되었어요.`;
+  // 내가 조직자가 아니라 초대받아 참석하기로 한 회의(selfOrganized === false)는
+  // 추천 엔진을 거치지 않았으므로 slot(점수/근거)이 없고, 조직자 전용 기능(일정
+  // 변경, 생성 이유/히스토리)도 의미가 없어 숨긴다.
+  const reasonCard = document.getElementById('detail-reason-text').closest('.card');
+  const historyCard = document.getElementById('detail-history').closest('.card');
+  const evidenceToggle = document.getElementById('detail-evidence-toggle');
+  const evidencePanel = document.getElementById('detail-evidence-panel');
+  const rescheduleBtn = document.getElementById('detail-reschedule-btn');
 
-  document.getElementById('detail-history').innerHTML = HISTORY_STEPS.map(step => `
-    <div class="history-step">
-      <span class="history-step-dot">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </span>
-      <span class="history-step-label">${step.label}</span>
-    </div>`).join('');
+  if (booking.selfOrganized === false) {
+    reasonCard.style.display = 'none';
+    historyCard.style.display = 'none';
+    evidenceToggle.style.display = 'none';
+    evidencePanel.classList.remove('open');
+    evidencePanel.style.display = 'none';
+    rescheduleBtn.style.display = 'none';
+  } else {
+    reasonCard.style.display = '';
+    historyCard.style.display = '';
+    evidenceToggle.style.display = '';
+    evidencePanel.style.display = '';
+    rescheduleBtn.style.display = '';
 
-  document.getElementById('detail-score').innerHTML = `<span class="score-num">0</span><span class="score-unit">점</span>`;
-  animateScoreNumber(document.querySelector('#detail-score .score-num'), slot.score);
-  const labelEl = document.getElementById('detail-score-label');
-  labelEl.textContent = slot.scoreLabel;
-  labelEl.className = `score-label score-label--${scoreLabelClass(slot.score)}`;
-  document.getElementById('detail-desc').textContent = slot.summary.message;
+    document.getElementById('detail-reason-text').textContent =
+      `이번 회의는 ${booking.purpose.emphasis}과 필참자의 합의를 가장 우선하여 추천되었어요.`;
 
-  document.getElementById('criteria-list').innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
-  mountHeatmap(document.getElementById('heatmap'), slot);
+    document.getElementById('detail-history').innerHTML = HISTORY_STEPS.map(step => `
+      <div class="history-step">
+        <span class="history-step-dot">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="history-step-label">${step.label}</span>
+      </div>`).join('');
+
+    document.getElementById('detail-score').innerHTML = `<span class="score-num">0</span><span class="score-unit">점</span>`;
+    animateScoreNumber(document.querySelector('#detail-score .score-num'), slot.score);
+    const labelEl = document.getElementById('detail-score-label');
+    labelEl.textContent = slot.scoreLabel;
+    labelEl.className = `score-label score-label--${scoreLabelClass(slot.score)}`;
+    document.getElementById('detail-desc').textContent = slot.summary.message;
+
+    document.getElementById('criteria-list').innerHTML = buildScoreBreakdownHtml(slot.detail, slot.weights);
+    mountHeatmap(document.getElementById('heatmap'), slot);
+  }
 }
 
 function renderOptionalList(booking) {
   const wrap = document.getElementById('detail-optional-list');
+  const progressWrap = document.getElementById('detail-optional-progress-wrap');
+  const remindBtn = document.getElementById('detail-optional-remind-btn');
+
   if (booking.optionalIds.length === 0) {
     wrap.innerHTML = `<li class="list-empty">선택 참석자가 없어요</li>`;
-    document.getElementById('detail-optional-summary').textContent = '';
+    progressWrap.style.display = 'none';
+    remindBtn.style.display = 'none';
     return;
   }
+
+  progressWrap.style.display = 'block';
+  remindBtn.style.display = 'block';
 
   const accepted = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'accepted');
   const declined = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'declined');
   const pending = booking.optionalIds.filter(id => booking.optionalStatus[id] === 'pending');
+  const respondedCount = accepted.length + declined.length;
+
+  // 필참자 의견 수집 화면과 같은 진행률 바 — "몇 명이 참석할지" 헤드카운트를 한눈에 보여준다.
+  document.getElementById('detail-optional-progress-count').textContent = `${respondedCount} / ${booking.optionalIds.length}`;
+  document.getElementById('detail-optional-progress-fill').style.width =
+    `${Math.round((respondedCount / booking.optionalIds.length) * 100)}%`;
   document.getElementById('detail-optional-summary').textContent =
     `${accepted.length}명 참석 · ${declined.length}명 불참 · ${pending.length}명 미응답`;
+  remindBtn.disabled = pending.length === 0;
 
   wrap.innerHTML = booking.optionalIds.map(id => {
     const person = ATTENDEES.find(a => a.id === id);
@@ -1517,18 +1608,28 @@ function renderOptionalList(booking) {
 
   wrap.querySelectorAll('.responder-row').forEach(row => {
     row.addEventListener('click', () => {
-      if (booking.optionalStatus[row.dataset.person] === 'pending') openOptinSheet(row.dataset.person);
+      if (booking.optionalStatus[row.dataset.person] === 'pending') {
+        openOptinSheetForBookingAttendee(booking, row.dataset.person);
+      }
     });
   });
 }
 
-// ---- 선택 참석자 알림 시트 (데모: 회의 확정 후 참석 여부만 시뮬레이션) ----
-function openOptinSheet(personId) {
-  state.activeRespondPersonId = personId;
-  const person = ATTENDEES.find(a => a.id === personId);
-  document.getElementById('optin-sheet-avatar').textContent = person.name[0];
-  document.getElementById('optin-sheet-name').textContent = person.name;
-  document.getElementById('optin-sheet-time').textContent = state.activeBooking.label;
+document.getElementById('detail-optional-remind-btn').addEventListener('click', () => {
+  showToast('미응답 선택 참석자에게 리마인드를 보냈어요.');
+});
+
+// ---- 선택 참석자 알림 시트 (데모: 이미 확정된 시간에 참석 여부만 응답) ----
+// opts: { avatarLabel, name, timeLabel, desc?, onRespond(status) }
+let activeOptinConfig = null;
+
+function openOptinSheet(opts) {
+  activeOptinConfig = opts;
+  document.getElementById('optin-sheet-avatar').textContent = opts.avatarLabel;
+  document.getElementById('optin-sheet-name').textContent = opts.name;
+  document.getElementById('optin-sheet-desc').textContent =
+    opts.desc || '회의는 이미 확정됐어요. 참석 여부만 알려주세요.';
+  document.getElementById('optin-sheet-time').textContent = opts.timeLabel;
   document.getElementById('optin-sheet-overlay').classList.add('open');
 }
 
@@ -1542,17 +1643,67 @@ document.getElementById('optin-sheet-overlay').addEventListener('click', (e) => 
 });
 
 function respondOptin(status) {
-  const booking = state.activeBooking;
-  const personId = state.activeRespondPersonId;
-  booking.optionalStatus[personId] = status;
+  const onRespond = activeOptinConfig.onRespond;
   closeOptinSheet();
-  const person = ATTENDEES.find(a => a.id === personId);
-  showToast(`${person.name}님이 ${status === 'accepted' ? '참석' : '불참'}으로 응답했어요.`);
-  renderOptionalList(booking);
+  onRespond(status);
 }
 
 document.getElementById('optin-accept-btn').addEventListener('click', () => respondOptin('accepted'));
 document.getElementById('optin-decline-btn').addEventListener('click', () => respondOptin('declined'));
+
+// 회의 상세 화면에서 조직자가 특정 선택 참석자의 응답을 시뮬레이션한다.
+function openOptinSheetForBookingAttendee(booking, personId) {
+  const person = ATTENDEES.find(a => a.id === personId);
+  openOptinSheet({
+    avatarLabel: person.name[0],
+    name: person.name,
+    timeLabel: booking.label,
+    onRespond: (status) => {
+      booking.optionalStatus[personId] = status;
+      showToast(`${person.name}님이 ${status === 'accepted' ? '참석' : '불참'}으로 응답했어요.`);
+      renderOptionalList(booking);
+    },
+  });
+}
+
+// 홈 화면 "나에게 온 제안(선택 참석)" 더미 초대에 응답한다.
+function openIncomingOptionalInviteSheet() {
+  const organizer = ATTENDEES.find(a => a.id === INCOMING_OPTIONAL_INVITE.organizerId);
+  openOptinSheet({
+    avatarLabel: organizer.name[0],
+    name: organizer.name,
+    timeLabel: INCOMING_OPTIONAL_INVITE.timeLabel,
+    desc: `${INCOMING_OPTIONAL_INVITE.title} 회의에 선택 참석자로 초대됐어요. 이미 확정된 시간이라 참석 여부만 알려주시면 돼요.`,
+    onRespond: (status) => {
+      state.incomingOptionalInviteResponse = status;
+
+      // 참석으로 응답하면 이 회의는 곧바로 "예정된 회의"에 등록된다 — 필참자 응답을
+      // 통해 확정된 회의라 별도 추천 점수(slot)는 없고, 조직자가 아니므로 일정 변경은
+      // 할 수 없다 (renderDetail에서 selfOrganized로 구분해 관련 UI를 숨긴다).
+      if (status === 'accepted') {
+        const purpose = MEETING_PURPOSES.find(p => p.id === INCOMING_OPTIONAL_INVITE.purposeId) || MEETING_PURPOSES[0];
+        state.bookings.push({
+          id: Date.now(),
+          title: INCOMING_OPTIONAL_INVITE.title,
+          location: INCOMING_OPTIONAL_INVITE.location,
+          slot: null,
+          attendeeIds: INCOMING_OPTIONAL_INVITE.requiredIds,
+          label: INCOMING_OPTIONAL_INVITE.timeLabel,
+          purpose,
+          requiredIds: INCOMING_OPTIONAL_INVITE.requiredIds,
+          optionalIds: [],
+          optionalStatus: {},
+          requiredSummary: { available: INCOMING_OPTIONAL_INVITE.requiredIds.length, total: INCOMING_OPTIONAL_INVITE.requiredIds.length },
+          selfOrganized: false,
+        });
+        showToast('참석으로 응답했어요. 예정된 회의에 등록됐어요.');
+      } else {
+        showToast('선택 참석 여부를 불참으로 응답했어요.');
+      }
+      renderHome();
+    },
+  });
+}
 
 document.getElementById('detail-evidence-toggle').addEventListener('click', function () {
   toggleEvidencePanel(document.getElementById('detail-evidence-panel'), this);
@@ -1673,6 +1824,7 @@ function confirmBooking(slot) {
   const booking = {
     id: Date.now(),
     title: state.meetingTitle.trim(),
+    location: state.meetingLocation.trim(),
     slot,
     attendeeIds,
     label,
@@ -1685,7 +1837,12 @@ function confirmBooking(slot) {
 
   state.bookings.push(booking);
   state.pendingMeetings = state.pendingMeetings.filter(p => p.id !== state.activePendingId);
-  showToast(`${label} 회의가 확정됐어요.`);
+
+  // 확정과 동시에 선택 참석자에게 참석 여부 확인을 요청한다 — 몇 명이 올지 미리 파악해서
+  // 회의를 준비할 수 있도록. (실제 응답은 회의 상세 화면에서 계속 모인다.)
+  showToast(state.optionalIds.length > 0
+    ? `${label} 회의가 확정됐어요. 선택 참석자 ${state.optionalIds.length}명에게 참석 여부를 요청했어요.`
+    : `${label} 회의가 확정됐어요.`);
   resetCreateFlow();
   renderHome();
   renderDetail(booking);
@@ -1713,10 +1870,17 @@ document.getElementById('detail-reschedule-btn').addEventListener('click', () =>
   showScreen('create');
 });
 
-// Cancel booking — destructive, so confirm first.
-document.getElementById('detail-cancel-btn').addEventListener('click', () => {
+// 파괴적 동작(예약 취소, 제안 취소) 공용 확인 다이얼로그 — 열 때마다 제목/설명/버튼
+// 문구와 확인 시 실행할 콜백을 새로 채운다.
+let confirmDialogAction = null;
+
+function openConfirmDialog({ title, desc, confirmLabel, action }) {
+  document.getElementById('confirm-dialog-title').textContent = title;
+  document.getElementById('confirm-dialog-desc').textContent = desc;
+  document.getElementById('confirm-dialog-confirm').textContent = confirmLabel;
+  confirmDialogAction = action;
   document.getElementById('confirm-dialog-overlay').classList.add('open');
-});
+}
 
 function closeConfirmDialog() {
   document.getElementById('confirm-dialog-overlay').classList.remove('open');
@@ -1727,12 +1891,25 @@ document.getElementById('confirm-dialog-overlay').addEventListener('click', (e) 
   if (e.target.id === 'confirm-dialog-overlay') closeConfirmDialog();
 });
 document.getElementById('confirm-dialog-confirm').addEventListener('click', () => {
-  const booking = state.activeBooking;
-  state.bookings = state.bookings.filter(b => b.id !== booking.id);
+  const action = confirmDialogAction;
   closeConfirmDialog();
-  showToast('예약이 취소됐어요.');
-  renderHome();
-  showScreen('home');
+  if (action) action();
+});
+
+// Cancel booking — destructive, so confirm first.
+document.getElementById('detail-cancel-btn').addEventListener('click', () => {
+  openConfirmDialog({
+    title: '예약을 취소할까요?',
+    desc: '취소하면 예정된 회의 목록에서 바로 사라져요.',
+    confirmLabel: '예약 취소하기',
+    action: () => {
+      const booking = state.activeBooking;
+      state.bookings = state.bookings.filter(b => b.id !== booking.id);
+      showToast('예약이 취소됐어요.');
+      renderHome();
+      showScreen('home');
+    },
+  });
 });
 
 // ============================================================================
@@ -1764,36 +1941,65 @@ function avatarStackHtml(ids) {
 }
 
 // 다른 사람이 나를 필참자로 초대한 회의 — 더미 데이터(INCOMING_INVITE) 하나로
-// 카드 → 응답 시트(제목·참석자·후보 시간·제출) 흐름을 미리 확인할 수 있게 한다.
+// 카드 → 응답 시트(주제·참석자·후보 시간·제출) 흐름을, 선택 참석자로 초대한 회의
+// (INCOMING_OPTIONAL_INVITE)는 카드 → 참석/불참 시트 흐름을 미리 확인할 수 있게 한다.
 function renderIncomingList() {
   const section = document.getElementById('incoming-section');
   const wrap = document.getElementById('incoming-list');
 
+  const items = [];
+
   // 응답을 보내면 홈에서 바로 사라진다 — 더 이상 내가 할 일이 없는 항목이니까.
-  if (state.incomingInviteResponse) {
+  if (!state.incomingInviteResponse) {
+    const organizer = ATTENDEES.find(a => a.id === INCOMING_INVITE.organizerId);
+    const otherCount = INCOMING_INVITE.candidateLabels.length - 1;
+    items.push(`
+      <div class="meeting-item incoming" id="incoming-invite-item">
+        <div class="meeting-item-left">
+          <span class="meeting-item-time">${INCOMING_INVITE.title}</span>
+          <span class="meeting-item-count">${organizer.name}님의 제안 · ${INCOMING_INVITE.candidateLabels[0]}${otherCount > 0 ? ` 외 ${otherCount}건` : ''}</span>
+          ${INCOMING_INVITE.location ? `<span class="meeting-item-count">📍 ${INCOMING_INVITE.location}</span>` : ''}
+          <div class="meeting-item-attendees">${avatarStackHtml(INCOMING_INVITE.participantIds)}</div>
+        </div>
+        <div class="meeting-item-right">
+          <span class="status-chip status-chip--warning">응답 필요</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>`);
+  }
+
+  if (!state.incomingOptionalInviteResponse) {
+    const organizer = ATTENDEES.find(a => a.id === INCOMING_OPTIONAL_INVITE.organizerId);
+    items.push(`
+      <div class="meeting-item incoming" id="incoming-optional-invite-item">
+        <div class="meeting-item-left">
+          <span class="meeting-item-time">${INCOMING_OPTIONAL_INVITE.title}</span>
+          <span class="meeting-item-count">${organizer.name}님의 회의 · ${INCOMING_OPTIONAL_INVITE.timeLabel} (확정된 시간)</span>
+          ${INCOMING_OPTIONAL_INVITE.location ? `<span class="meeting-item-count">📍 ${INCOMING_OPTIONAL_INVITE.location}</span>` : ''}
+          <div class="meeting-item-attendees">${avatarStackHtml(INCOMING_OPTIONAL_INVITE.requiredIds)}</div>
+        </div>
+        <div class="meeting-item-right">
+          <span class="status-chip status-chip--pending">선택 참석</span>
+          <span class="status-chip status-chip--warning">응답 필요</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>`);
+  }
+
+  if (items.length === 0) {
     section.style.display = 'none';
     wrap.innerHTML = '';
     return;
   }
 
-  const organizer = ATTENDEES.find(a => a.id === INCOMING_INVITE.organizerId);
-  const otherCount = INCOMING_INVITE.candidateLabels.length - 1;
-
   section.style.display = 'block';
-  wrap.innerHTML = `
-    <div class="meeting-item incoming" id="incoming-invite-item">
-      <div class="meeting-item-left">
-        <span class="meeting-item-time">${INCOMING_INVITE.title}</span>
-        <span class="meeting-item-count">${organizer.name}님의 제안 · ${INCOMING_INVITE.candidateLabels[0]}${otherCount > 0 ? ` 외 ${otherCount}건` : ''}</span>
-        <div class="meeting-item-attendees">${avatarStackHtml(INCOMING_INVITE.participantIds)}</div>
-      </div>
-      <div class="meeting-item-right">
-        <span class="status-chip status-chip--warning">응답 필요</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </div>`;
+  wrap.innerHTML = items.join('');
 
-  document.getElementById('incoming-invite-item').addEventListener('click', openIncomingInviteSheet);
+  const requiredItem = document.getElementById('incoming-invite-item');
+  if (requiredItem) requiredItem.addEventListener('click', openIncomingInviteSheet);
+
+  const optionalItem = document.getElementById('incoming-optional-invite-item');
+  if (optionalItem) optionalItem.addEventListener('click', openIncomingOptionalInviteSheet);
 }
 
 // 필참자에게 제안했지만 아직 확정되지 않은 회의 — 응답 진행 상황과 함께 보여주고,
@@ -1813,6 +2019,7 @@ function renderPendingList() {
     const respondedCount = p.requiredIds.filter(id =>
       p.candidates.some(slot => p.responses[slot.id] && p.responses[slot.id][id] !== undefined)
     ).length;
+    const allResponded = respondedCount === p.requiredIds.length;
     const otherCount = p.candidateLabels.length - 1;
     const timeCaption = `${p.candidateLabels[0]}${otherCount > 0 ? ` 외 ${otherCount}건` : ''}`;
     return `
@@ -1820,10 +2027,11 @@ function renderPendingList() {
         <div class="meeting-item-left">
           <span class="meeting-item-time">${p.title || timeCaption}</span>
           ${p.title ? `<span class="meeting-item-count">${timeCaption}</span>` : ''}
+          ${p.location ? `<span class="meeting-item-count">📍 ${p.location}</span>` : ''}
           <div class="meeting-item-attendees">${avatarStackHtml(p.requiredIds)}</div>
         </div>
         <div class="meeting-item-right">
-          <span class="status-chip status-chip--pending">응답 ${respondedCount}/${p.requiredIds.length}</span>
+          <span class="status-chip ${allResponded ? 'status-chip--done status-chip--complete' : 'status-chip--pending'}">응답 ${respondedCount}/${p.requiredIds.length}</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
       </div>`;
@@ -1857,7 +2065,9 @@ function renderHome() {
     upcomingWrap.innerHTML = state.bookings.slice().reverse().map((b, i) => `
       <div class="meeting-item" data-booking="${b.id}" style="animation-delay:${i * 45}ms">
         <div class="meeting-item-left">
-          <span class="meeting-item-time">${b.label}</span>
+          <span class="meeting-item-time">${b.title || b.label}</span>
+          ${b.title ? `<span class="meeting-item-count">${b.label}</span>` : ''}
+          ${b.location ? `<span class="meeting-item-count">📍 ${b.location}</span>` : ''}
           <div class="meeting-item-attendees">${avatarStackHtml(b.attendeeIds)}</div>
         </div>
         <div class="meeting-item-right">
@@ -1882,6 +2092,7 @@ function renderHome() {
       <div class="meeting-item-left">
         <span class="meeting-item-time">${m.title}</span>
         <span class="meeting-item-count">${m.dateLabel}</span>
+        ${m.location ? `<span class="meeting-item-count">📍 ${m.location}</span>` : ''}
         <div class="meeting-item-attendees">${avatarStackHtml(m.attendeeIds)}</div>
       </div>
       <div class="meeting-item-right">
@@ -1909,7 +2120,10 @@ document.getElementById('auth-switch-btn').addEventListener('click', () => setAu
 
 function completeLogin({ name, email } = {}) {
   document.getElementById('auth-view').style.display = 'none';
-  document.getElementById('app-shell').style.display = 'flex';
+  // 'flex'를 직접 박아넣지 않는다 — 인라인 스타일은 미디어쿼리보다 우선순위가 높아서
+  // 모바일에서 .app-shell이 block으로 못 바뀌고 계속 flex(가로 배치)로 깨졌었다.
+  // 빈 문자열로 지워서 스타일시트(반응형 규칙 포함)가 다시 결정하게 한다.
+  document.getElementById('app-shell').style.display = '';
 
   const displayName = name || (email ? email.split('@')[0] : '나');
   document.querySelector('.user-name').textContent = displayName;
@@ -1943,6 +2157,19 @@ document.getElementById('google-login-btn').addEventListener('click', () => {
 });
 document.getElementById('kakao-login-btn').addEventListener('click', () => {
   completeLogin({ name: '카카오 사용자', email: 'kakao_user@kakao.com' });
+});
+
+// 모바일에서는 캘린더 아이콘을 숨겼으니(styles.css), 날짜 입력창을 탭하면 텍스트
+// 세그먼트를 편집하는 대신 아이콘을 눌렀을 때와 동일하게 캘린더가 뜨도록 한다.
+function bindMobileDatePicker(input) {
+  input.addEventListener('click', () => {
+    if (window.innerWidth <= 900 && typeof input.showPicker === 'function') {
+      try { input.showPicker(); } catch (e) { /* 사용자 제스처 없이 호출된 경우 등은 무시 */ }
+    }
+  });
+}
+['meeting-date-input', 'period-start-input', 'period-end-input'].forEach(id => {
+  bindMobileDatePicker(document.getElementById(id));
 });
 
 // ============================================================================

@@ -136,7 +136,7 @@
 
       <div class="list-section" id="incoming-section" style="display:none;">
         <h2 class="list-section-title">나에게 온 제안</h2>
-        <p class="card-desc" style="margin:0 0 var(--space-3);">다른 사람이 나를 필참자로 제안한 회의예요. 응답해주세요.</p>
+        <p class="card-desc" style="margin:0 0 var(--space-3);">다른 사람이 나를 참석자로 초대한 회의예요. 응답해주세요.</p>
         <div id="incoming-list"><!-- injected by JS --></div>
       </div>
 
@@ -164,22 +164,17 @@
         <p class="screen-subtitle">참석자만 선택하세요. 시간 비교는 저희가 대신 해드려요.</p>
       </div>
 
-      <div class="stepper">
-        <span class="stepper-step" data-step="recommend">추천</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="collect">의견수집</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="consensus">합의</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="confirm">확정</span>
-      </div>
-
       <!-- Step A: form -->
       <div id="meeting-form">
         <div class="card">
-          <div class="card-title">회의 제목 <span class="required-mark">*</span></div>
+          <div class="card-title">회의 주제 <span class="required-mark">*</span></div>
           <p class="card-desc">필참자에게 어떤 회의인지 바로 보여줘요.</p>
           <input type="text" class="select" id="meeting-title-input" placeholder="예: 주간 마케팅 싱크" maxlength="60" autocomplete="off" required aria-required="true">
+
+          <div class="field" style="margin-top: var(--space-4);">
+            <label class="field-label" for="meeting-location-input">장소 <span style="color: var(--color-text-tertiary); font-weight: 400;">(선택)</span></label>
+            <input type="text" class="select" id="meeting-location-input" placeholder="예: 3층 회의실 A, 온라인(Zoom)" maxlength="60" autocomplete="off">
+          </div>
         </div>
 
         <div class="card">
@@ -347,16 +342,6 @@
         <p class="screen-subtitle">필참자가 가능한 시간을 선택하면 MeetFit이 합의 결과를 계산해요.</p>
       </div>
 
-      <div class="stepper">
-        <span class="stepper-step" data-step="recommend">추천</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step current" data-step="collect">의견수집</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="consensus">합의</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="confirm">확정</span>
-      </div>
-
       <div class="card">
         <div class="card-title">제안한 시간 후보</div>
         <div class="mini-candidate-list" id="collect-candidates"><!-- injected by JS --></div>
@@ -380,6 +365,9 @@
 
       <div class="sticky-cta">
         <button class="btn btn-primary btn-block" id="collect-done-btn">합의 결과 보기</button>
+        <button class="btn btn-ghost btn-block" id="collect-edit-btn">제안 수정하기</button>
+        <p class="card-desc hint" id="collect-edit-hint" style="display:none;">이미 응답한 필참자가 있어 수정할 수 없어요. 취소 후 다시 만들어주세요.</p>
+        <button class="btn btn-text btn-text-danger btn-block" id="collect-cancel-btn">제안 취소하기</button>
       </div>
     </section>
 
@@ -388,16 +376,6 @@
       <div class="screen-header">
         <h1>MeetFit 합의 결과</h1>
         <p class="screen-subtitle">필참자 응답을 분석해서 가장 합의하기 쉬운 시간을 찾았어요.</p>
-      </div>
-
-      <div class="stepper">
-        <span class="stepper-step" data-step="recommend">추천</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="collect">의견수집</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step current" data-step="consensus">합의</span>
-        <span class="stepper-arrow">→</span>
-        <span class="stepper-step" data-step="confirm">확정</span>
       </div>
 
       <div class="hero-card">
@@ -601,6 +579,7 @@
         <h2 class="booking-title" id="detail-meeting-title" style="display:none;"></h2>
         <p class="booking-summary-label">확정된 시간</p>
         <div class="booking-summary-time" id="detail-time">오늘 오후 2:00 – 3:00</div>
+        <p class="booking-summary-location" id="detail-location" style="display:none;"></p>
         <span class="purpose-tag" id="detail-purpose-chip"></span>
         <div class="booking-summary-attendees" id="detail-attendees" style="margin-top: var(--space-4);"><!-- injected by JS --></div>
       </div>
@@ -611,11 +590,19 @@
           <span class="attendee-role-label">필참</span>
           <span class="status-chip status-chip--done" id="detail-required-summary"></span>
         </div>
-        <div class="attendee-role-row">
-          <span class="attendee-role-label">선택 참석</span>
-          <span class="card-desc" style="margin:0;" id="detail-optional-summary"></span>
+
+        <div id="detail-optional-progress-wrap" style="margin-top: var(--space-5);">
+          <div class="progress-header">
+            <span class="progress-count" id="detail-optional-progress-count">0 / 0</span>
+            <span class="progress-label">선택 참석 응답</span>
+          </div>
+          <div class="progress-bar"><span class="progress-fill" id="detail-optional-progress-fill" style="width:0%"></span></div>
+          <p class="card-desc" id="detail-optional-summary" style="margin-top: var(--space-2);"></p>
         </div>
+
+        <p class="card-desc" style="margin: var(--space-3) 0 0;">미응답 행을 눌러 참석 여부 응답을 시뮬레이션해보세요. (데모)</p>
         <ul class="attendee-list" id="detail-optional-list" style="margin-top: var(--space-3);"><!-- injected by JS --></ul>
+        <button type="button" class="btn btn-ghost btn-block" id="detail-optional-remind-btn" style="margin-top: var(--space-4);">미응답 선택 참석자에게 리마인드 보내기</button>
       </div>
 
       <div class="card">
@@ -730,13 +717,14 @@
       <span>전체 선택</span>
     </label>
     <div class="check-list" id="picker-list"><!-- injected by JS --></div>
-    <button class="btn btn-primary btn-block" id="picker-confirm-btn" style="margin-top: var(--space-6);">추가하기</button>
+    <button class="btn btn-primary btn-block" id="picker-confirm-btn">추가하기</button>
   </div>
 </div>
 
 <!-- 필참자 응답 시뮬레이션 시트 (데모: 조직자가 특정 필참자 입장에서 응답) -->
 <div class="respond-modal-overlay" id="respond-sheet-overlay">
   <div class="respond-modal" role="dialog" aria-modal="true" aria-labelledby="respond-sheet-title">
+    <div class="sheet-handle"></div>
     <button class="icon-btn sheet-close" id="respond-sheet-close-btn" aria-label="닫기">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -758,8 +746,8 @@
 </div>
 
 <!-- 선택 참석자 알림 시트 (데모: 회의 확정 후 참석 여부만 선택) -->
-<div class="sheet-overlay" id="optin-sheet-overlay">
-  <div class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="optin-sheet-name">
+<div class="respond-modal-overlay" id="optin-sheet-overlay">
+  <div class="respond-modal" role="dialog" aria-modal="true" aria-labelledby="optin-sheet-name">
     <div class="sheet-handle"></div>
     <button class="icon-btn sheet-close" id="optin-sheet-close-btn" aria-label="닫기">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -770,7 +758,7 @@
         <div class="sheet-name" id="optin-sheet-name">민수</div>
       </div>
     </div>
-    <p class="card-desc">회의는 이미 확정됐어요. 참석 여부만 알려주세요.</p>
+    <p class="card-desc" id="optin-sheet-desc">회의는 이미 확정됐어요. 참석 여부만 알려주세요.</p>
     <div class="optin-sheet-time" id="optin-sheet-time"></div>
     <div class="optin-actions">
       <button class="btn btn-ghost btn-block" id="optin-decline-btn">불참</button>
@@ -779,11 +767,11 @@
   </div>
 </div>
 
-<!-- Cancel-booking confirmation dialog -->
+<!-- 파괴적 동작(예약 취소, 제안 취소) 공용 확인 다이얼로그 — 열 때마다 제목/설명/버튼 문구를 JS로 채운다 -->
 <div class="dialog-overlay" id="confirm-dialog-overlay">
   <div class="dialog-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
     <h3 class="dialog-title" id="confirm-dialog-title">예약을 취소할까요?</h3>
-    <p class="dialog-desc">취소하면 예정된 회의 목록에서 바로 사라져요.</p>
+    <p class="dialog-desc" id="confirm-dialog-desc">취소하면 예정된 회의 목록에서 바로 사라져요.</p>
     <div class="dialog-actions">
       <button class="btn btn-ghost btn-block" id="confirm-dialog-dismiss">돌아가기</button>
       <button class="btn btn-danger btn-block" id="confirm-dialog-confirm">예약 취소하기</button>
