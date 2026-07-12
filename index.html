@@ -277,61 +277,75 @@
           </button>
         </div>
 
-        <div class="hero-card">
-          <p class="hero-meeting-title" id="hero-meeting-title" style="display:none;"></p>
-          <p class="hero-eyebrow">
-            <span class="rank-badge rank-badge--lg">🥇</span> 가장 추천
-          </p>
-          <div class="hero-time" id="hero-time">오늘 오후 2:00 – 3:00</div>
+        <div id="results-success">
+          <div class="hero-card">
+            <p class="hero-meeting-title" id="hero-meeting-title" style="display:none;"></p>
+            <p class="hero-eyebrow">
+              <span class="rank-badge rank-badge--lg">🥇</span> 가장 추천
+            </p>
+            <div class="hero-time" id="hero-time">오늘 오후 2:00 – 3:00</div>
 
-          <ul class="reason-list" id="hero-reasons"><!-- injected by JS --></ul>
+            <ul class="reason-list" id="hero-reasons"><!-- injected by JS --></ul>
 
-          <div class="hero-actions">
-            <button class="btn btn-primary btn-block" id="propose-btn">필참자에게 제안하기</button>
-            <p class="card-desc hint" style="margin:0;">아직 회의는 확정되지 않았어요. 필참자 의견을 모아 합의된 시간으로 확정해요.</p>
-            <button type="button" class="btn btn-ghost btn-block evidence-toggle" id="hero-evidence-toggle" aria-expanded="false" aria-controls="hero-evidence-panel">
-              <span class="evidence-toggle-label">적합도 근거 보기</span>
-              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <div class="hero-actions">
+              <button type="button" class="btn btn-ghost btn-block evidence-toggle" id="hero-evidence-toggle" aria-expanded="false" aria-controls="hero-evidence-panel">
+                <span class="evidence-toggle-label">적합도 근거 보기</span>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="evidence-panel" id="hero-evidence-panel">
-          <div class="evidence-panel-inner">
-            <div class="card">
-              <div class="hero-score-row">
-                <div class="score-badge score-badge--xl" id="hero-score">96<span class="score-unit">점</span></div>
-                <div class="score-meta">
-                  <div class="stars" aria-hidden="true">★★★★★</div>
-                  <div class="score-label score-label--great" id="hero-score-label">매우 적합</div>
+          <div class="evidence-panel" id="hero-evidence-panel">
+            <div class="evidence-panel-inner">
+              <div class="card">
+                <div class="hero-score-row">
+                  <div class="score-badge score-badge--xl" id="hero-score">96<span class="score-unit">점</span></div>
+                  <div class="score-meta">
+                    <div class="stars" aria-hidden="true">★★★★★</div>
+                    <div class="score-label score-label--great" id="hero-score-label">매우 적합</div>
+                  </div>
+                </div>
+                <p class="hero-summary-message" id="hero-summary-message">모두의 업무 흐름을 고려했을 때 가장 회의하기 좋은 시간이에요.</p>
+                <div class="attendance-row">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  참석률 <b id="hero-attendance">100%</b>&nbsp;· 필참 모두 참석 가능
                 </div>
               </div>
-              <p class="hero-summary-message" id="hero-summary-message">모두의 업무 흐름을 고려했을 때 가장 회의하기 좋은 시간이에요.</p>
-              <div class="attendance-row">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                참석률 <b id="hero-attendance">100%</b>&nbsp;· 필참 모두 참석 가능
+              <div class="card">
+                <div class="card-title">회의 적합도 계산 기준</div>
+                <div class="criteria-list" id="hero-criteria"><!-- injected by JS --></div>
               </div>
-            </div>
-            <div class="card">
-              <div class="card-title">회의 적합도 계산 기준</div>
-              <div class="criteria-list" id="hero-criteria"><!-- injected by JS --></div>
-            </div>
-            <div class="card">
-              <div class="card-title">참석자별 회의 적합도</div>
-              <p class="card-desc">사람 중심으로 구성했어요. 각 셀을 눌러 이유를 확인하세요.</p>
-              <div class="heatmap-scroll"><div class="heatmap" id="hero-heatmap"><!-- injected by JS --></div></div>
-              <div class="legend">
-                <span class="legend-item"><span class="legend-dot good"></span>회의하기 좋은 시간</span>
-                <span class="legend-item"><span class="legend-dot caution"></span>가능하지만 추천하지 않음</span>
-                <span class="legend-item"><span class="legend-dot bad"></span>참석 어려움</span>
-                <span class="legend-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F5A623"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>가장 적합한 시간</span>
+              <div class="card">
+                <div class="card-title">참석자별 회의 적합도</div>
+                <p class="card-desc">사람 중심으로 구성했어요. 각 셀을 눌러 이유를 확인하세요.</p>
+                <div class="heatmap-scroll"><div class="heatmap" id="hero-heatmap"><!-- injected by JS --></div></div>
+                <div class="legend">
+                  <span class="legend-item"><span class="legend-dot good"></span>회의하기 좋은 시간</span>
+                  <span class="legend-item"><span class="legend-dot caution"></span>가능하지만 추천하지 않음</span>
+                  <span class="legend-item"><span class="legend-dot bad"></span>참석 어려움</span>
+                  <span class="legend-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F5A623"><path d="M12 2l2.4 7.2H22l-6 4.6 2.4 7.2L12 16.4l-6.4 4.6L8 13.8 2 9.2h7.6L12 2z"/></svg>가장 적합한 시간</span>
+                </div>
               </div>
             </div>
           </div>
+
+          <p class="alt-slots-label">다른 추천 시간</p>
+          <div id="alt-slots"><!-- injected by JS --></div>
+
+          <div class="sticky-cta">
+            <button class="btn btn-primary btn-block" id="propose-btn">필참자에게 제안하기</button>
+            <p class="card-desc hint" style="margin:var(--space-2) 0 0;">위 TOP 3 시간을 필참자에게 함께 보내 그중 가능한 시간을 고르게 해요. 아직 회의는 확정되지 않았어요.</p>
+          </div>
         </div>
 
-        <p class="alt-slots-label">다른 추천 시간</p>
-        <div id="alt-slots"><!-- injected by JS --></div>
+        <div class="empty-state" id="results-empty" style="display:none;">
+          <span class="empty-state-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 8l6 6M14 8l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <p class="empty-state-title">모두가 가능한 시간을 찾지 못했어요</p>
+          <p class="empty-state-desc" id="results-empty-desc">필참자가 많을수록 모두의 일정이 겹치는 시간을 찾기 어려워요. 필참자를 줄이거나 선택 참석으로 바꿔보세요.</p>
+          <button type="button" class="btn btn-primary" id="results-empty-edit-btn">참석자 다시 선택</button>
+        </div>
       </div>
     </section>
 
@@ -583,6 +597,7 @@
 
       <div class="sticky-cta">
         <button class="btn btn-primary btn-block" id="save-profile-btn">저장하기</button>
+        <button type="button" class="btn btn-ghost btn-block" id="logout-btn">로그아웃</button>
       </div>
     </section>
 
@@ -635,11 +650,6 @@
         <p class="card-desc" id="detail-reason-text" style="margin:0;"></p>
       </div>
 
-      <div class="card">
-        <div class="card-title">회의 생성 히스토리</div>
-        <div class="history-timeline" id="detail-history"><!-- injected by JS --></div>
-      </div>
-
       <button type="button" class="btn btn-ghost btn-block evidence-toggle" id="detail-evidence-toggle" aria-expanded="false" aria-controls="detail-evidence-panel">
         <span class="evidence-toggle-label">적합도 근거 보기</span>
         <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -676,7 +686,7 @@
         </div>
       </div>
 
-      <div class="sticky-cta detail-actions">
+      <div class="sticky-cta">
         <button class="btn btn-ghost btn-block" id="detail-reschedule-btn">일정 변경하기</button>
         <button class="btn btn-text btn-text-danger btn-block" id="detail-cancel-btn">예약 취소</button>
       </div>
@@ -800,6 +810,17 @@
     <div class="dialog-actions">
       <button class="btn btn-ghost btn-block" id="confirm-dialog-dismiss">돌아가기</button>
       <button class="btn btn-danger btn-block" id="confirm-dialog-confirm">예약 취소하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 내가 참석자로 있던 회의가 조직자에 의해 취소됐다는 알림 (데모: 홈의 "나에게 온 제안"에서 진입) -->
+<div class="dialog-overlay" id="cancel-notice-overlay">
+  <div class="dialog-box" role="alertdialog" aria-modal="true" aria-labelledby="cancel-notice-title">
+    <h3 class="dialog-title" id="cancel-notice-title">회의가 취소됐어요</h3>
+    <p class="dialog-desc" id="cancel-notice-desc"></p>
+    <div class="dialog-actions">
+      <button class="btn btn-primary btn-block" id="cancel-notice-confirm-btn">확인</button>
     </div>
   </div>
 </div>

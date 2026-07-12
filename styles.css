@@ -1123,6 +1123,9 @@ select.minute-select {
 .sticky-cta {
   position: sticky;
   bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   background: linear-gradient(to top, var(--color-bg-secondary) 60%, transparent);
   padding: var(--space-6) 0 0;
   margin-top: var(--space-4);
@@ -1724,12 +1727,6 @@ select.minute-select {
   line-height: 1.6;
 }
 
-.detail-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 .btn-text-danger {
   color: var(--color-danger);
 }
@@ -2194,6 +2191,36 @@ select.minute-select {
   }
 
   .respond-modal .sheet-handle {
+    display: none;
+  }
+}
+
+/* 참석자 추가 시트는 태블릿/데스크탑에서 다른 참석자 상세 패널과 달리 오른쪽에서
+   슬라이드하지 않고, 응답 모달과 같은 중앙 모달로 뜬다. */
+@media (min-width: 901px) {
+  #picker-overlay {
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+    padding: var(--space-4);
+  }
+
+  #picker-overlay .bottom-sheet {
+    max-width: 480px;
+    width: 100%;
+    height: auto;
+    max-height: 85dvh;
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transform: scale(0.96) translateY(8px);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+
+  #picker-overlay.open .bottom-sheet {
+    transform: scale(1) translateY(0);
+  }
+
+  #picker-overlay .sheet-handle {
     display: none;
   }
 }
@@ -2676,48 +2703,6 @@ select.minute-select {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-secondary);
-}
-
-.history-timeline {
-  display: flex;
-  flex-direction: column;
-}
-
-.history-step {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-}
-
-.history-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 11px;
-  top: 32px;
-  bottom: -8px;
-  width: 2px;
-  background: var(--color-border);
-}
-
-.history-step-dot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--color-success);
-  color: #fff;
-  z-index: 1;
-}
-
-.history-step-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
 }
 
 /* ==========================================================================

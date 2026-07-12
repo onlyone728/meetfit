@@ -457,13 +457,15 @@ const INCOMING_OPTIONAL_INVITE = {
   location: '4층 라운지',
 };
 
-// 회의 상세의 "회의 생성 히스토리" 타임라인에 쓰이는 4단계.
-const HISTORY_STEPS = [
-  { id: 'recommend', label: '추천 완료' },
-  { id: 'collect', label: '필참 의견 수집' },
-  { id: 'consensus', label: '합의 완료' },
-  { id: 'confirm', label: '회의 확정' },
-];
+// 홈 화면 "나에게 온 제안" 세 번째 시나리오 — 내가 필참자로 참여하던, 이미 확정된
+// 회의를 조직자가 취소한 경우. 확정 후 취소는 반드시 참석자에게 알려야 하므로,
+// 취소 쪽에서도 초대 수락만큼 눈에 띄는 응답형 알림으로 노출한다.
+const INCOMING_CANCEL_NOTICE = {
+  organizerId: 'younghee',
+  title: '디자인 시스템 정기 리뷰',
+  timeLabel: '내일 오전 10:00 – 11:00',
+  location: '5층 회의실 B',
+};
 
 // ============================================================================
 // 목적별 추천 랭킹 — 매번 새로 계산한다 (사전계산/캐시하지 않음). SLOTS의 원본
@@ -555,6 +557,7 @@ const state = {
   activeRespondConfig: null, // 지금 열려있는 응답 시트가 무엇에 대한 것인지(주제/참석자/후보/제출 콜백)
   incomingInviteResponse: null, // 홈의 "나에게 온 제안" 더미 초대에 대한 내 응답 — null이면 아직 미응답
   incomingOptionalInviteResponse: null, // 홈의 "나에게 온 제안(선택 참석)" 더미 초대에 대한 내 응답
+  incomingCancelNoticeSeen: false, // 홈의 취소 알림 더미를 확인했는지 — true면 홈 목록에서 사라진다
   consensusResult: [],       // computeConsensus() 결과 — 회의 확정 시 참고
   activeBooking: null,       // the booking currently shown on Screen 06
   bookings: [],              // confirmed upcoming meetings
@@ -943,18 +946,39 @@ function renderHeroCard(slot) {
   document.getElementById('hero-attendance').textContent = `${slot.attendanceRate}%`;
 }
 
+// 필참자가 많을수록 모두가 가능한 시간을 찾기 어렵다는 이 서비스의 핵심 전제를
+// 보여주기 위한 데모 트리거 — 실제 추천 엔진은 고정된 3개 후보(SLOTS)만 채점하므로
+// 필참자 조합만으로 "정말" 0건이 나오지는 않는다. 필참 5명 이상이면 빈 상태로 보여준다.
+const NO_RESULTS_REQUIRED_THRESHOLD = 5;
+
 document.getElementById('find-time-btn').addEventListener('click', () => {
   if (!state.meetingTitle.trim() || state.selectedAttendeeIds.length === 0 || !state.purpose) return;
   document.getElementById('meeting-form').style.display = 'none';
   document.getElementById('loading-wrap').style.display = 'flex';
   setTimeout(() => {
-    state.currentRecommendations = rankSlotsForPurpose(state.purpose);
+    const requiredCount = state.selectedAttendeeIds.filter(id => state.attendance[id]).length;
     document.getElementById('loading-wrap').style.display = 'none';
     document.getElementById('meeting-results').style.display = 'block';
+
+    if (requiredCount >= NO_RESULTS_REQUIRED_THRESHOLD) {
+      state.currentRecommendations = [];
+      document.getElementById('results-success').style.display = 'none';
+      document.getElementById('results-empty').style.display = 'flex';
+      return;
+    }
+
+    state.currentRecommendations = rankSlotsForPurpose(state.purpose);
+    document.getElementById('results-empty').style.display = 'none';
+    document.getElementById('results-success').style.display = 'block';
     renderHeroCard(state.currentRecommendations[0]);
     mountEvidence('hero', state.currentRecommendations[0], state.selectedAttendeeIds);
     renderAltSlots();
   }, 900);
+});
+
+document.getElementById('results-empty-edit-btn').addEventListener('click', () => {
+  document.getElementById('meeting-results').style.display = 'none';
+  document.getElementById('meeting-form').style.display = 'block';
 });
 
 document.getElementById('edit-attendees-btn').addEventListener('click', () => {
@@ -1632,37 +1656,26 @@ function renderDetail(booking) {
 
   // 내가 조직자가 아니라 초대받아 참석하기로 한 회의(selfOrganized === false)는
   // 추천 엔진을 거치지 않았으므로 slot(점수/근거)이 없고, 조직자 전용 기능(일정
-  // 변경, 생성 이유/히스토리)도 의미가 없어 숨긴다.
+  // 변경, 생성 이유)도 의미가 없어 숨긴다.
   const reasonCard = document.getElementById('detail-reason-text').closest('.card');
-  const historyCard = document.getElementById('detail-history').closest('.card');
   const evidenceToggle = document.getElementById('detail-evidence-toggle');
   const evidencePanel = document.getElementById('detail-evidence-panel');
   const rescheduleBtn = document.getElementById('detail-reschedule-btn');
 
   if (booking.selfOrganized === false) {
     reasonCard.style.display = 'none';
-    historyCard.style.display = 'none';
     evidenceToggle.style.display = 'none';
     evidencePanel.classList.remove('open');
     evidencePanel.style.display = 'none';
     rescheduleBtn.style.display = 'none';
   } else {
     reasonCard.style.display = '';
-    historyCard.style.display = '';
     evidenceToggle.style.display = '';
     evidencePanel.style.display = '';
     rescheduleBtn.style.display = '';
 
     document.getElementById('detail-reason-text').textContent =
       `이번 회의는 ${booking.purpose.emphasis}과 필참자의 합의를 가장 우선하여 추천되었어요.`;
-
-    document.getElementById('detail-history').innerHTML = HISTORY_STEPS.map(step => `
-      <div class="history-step">
-        <span class="history-step-dot">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        <span class="history-step-label">${step.label}</span>
-      </div>`).join('');
 
     document.getElementById('detail-score').innerHTML = `<span class="score-num">0</span><span class="score-unit">점</span>`;
     animateScoreNumber(document.querySelector('#detail-score .score-num'), slot.score);
@@ -1921,6 +1934,7 @@ document.addEventListener('keydown', (e) => {
     closeConfirmDialog();
     closeRespondSheet();
     closeOptinSheet();
+    closeCancelNoticeDialog();
   }
 });
 
@@ -1974,24 +1988,33 @@ document.getElementById('detail-back-btn').addEventListener('click', () => {
 });
 
 // Reschedule: drop the current booking but carry its title/location/attendees/purpose into a fresh search.
+// 취소와 마찬가지로 확정된 시간을 없애는 파괴적 동작이라 확인을 거치고, 참석자에게도
+// 변경 사실을 반드시 알려야 한다 — 그렇지 않으면 옛 시간 그대로 알고 있는 사람이 생긴다.
 document.getElementById('detail-reschedule-btn').addEventListener('click', () => {
   const booking = state.activeBooking;
-  state.bookings = state.bookings.filter(b => b.id !== booking.id);
-  resetCreateFlow();
-  state.meetingTitle = booking.title;
-  document.getElementById('meeting-title-input').value = booking.title;
-  state.meetingLocation = booking.location || '';
-  document.getElementById('meeting-location-input').value = booking.location || '';
-  state.selectedAttendeeIds = [...booking.attendeeIds];
-  state.purpose = booking.purpose.id;
-  booking.attendeeIds.forEach(id => {
-    state.attendance[id] = booking.requiredIds.includes(id);
+  openConfirmDialog({
+    title: '일정을 변경할까요?',
+    desc: '변경하면 지금 확정된 시간은 취소되고, 참석자 전원에게 일정 변경 알림이 전송돼요. 새 시간을 다시 찾아야 해요.',
+    confirmLabel: '일정 변경하기',
+    action: () => {
+      state.bookings = state.bookings.filter(b => b.id !== booking.id);
+      resetCreateFlow();
+      state.meetingTitle = booking.title;
+      document.getElementById('meeting-title-input').value = booking.title;
+      state.meetingLocation = booking.location || '';
+      document.getElementById('meeting-location-input').value = booking.location || '';
+      state.selectedAttendeeIds = [...booking.attendeeIds];
+      state.purpose = booking.purpose.id;
+      booking.attendeeIds.forEach(id => {
+        state.attendance[id] = booking.requiredIds.includes(id);
+      });
+      renderPurposeOptions();
+      renderAttendeeList();
+      renderHome();
+      showToast(`참석자 ${booking.attendeeIds.length}명에게 일정 변경 알림을 보냈어요. 제목·참석자·회의 목적은 그대로 뒀어요 — 새 시간을 찾아보세요.`);
+      showScreen('create');
+    },
   });
-  renderPurposeOptions();
-  renderAttendeeList();
-  renderHome();
-  showToast('제목·참석자·회의 목적은 그대로 뒀어요. 새 시간을 찾아보세요.');
-  showScreen('create');
 });
 
 // 파괴적 동작(예약 취소, 제안 취소) 공용 확인 다이얼로그 — 열 때마다 제목/설명/버튼
@@ -2020,16 +2043,18 @@ document.getElementById('confirm-dialog-confirm').addEventListener('click', () =
   if (action) action();
 });
 
-// Cancel booking — destructive, so confirm first.
+// Cancel booking — destructive, so confirm first. 확정된 회의를 취소하면 참석자
+// 전원(필참+선택)에게 취소 사실을 반드시 알려야 한다 — 그렇지 않으면 취소된 줄
+// 모르고 나타나는 사람이 생긴다.
 document.getElementById('detail-cancel-btn').addEventListener('click', () => {
   openConfirmDialog({
     title: '예약을 취소할까요?',
-    desc: '취소하면 예정된 회의 목록에서 바로 사라져요.',
+    desc: '취소하면 예정된 회의 목록에서 바로 사라지고, 참석자 전원에게 취소 알림이 전송돼요.',
     confirmLabel: '예약 취소하기',
     action: () => {
       const booking = state.activeBooking;
       state.bookings = state.bookings.filter(b => b.id !== booking.id);
-      showToast('예약이 취소됐어요.');
+      showToast(`예약이 취소됐어요. 참석자 ${booking.attendeeIds.length}명에게 취소 알림을 보냈어요.`);
       renderHome();
       showScreen('home');
     },
@@ -2110,6 +2135,24 @@ function renderIncomingList() {
       </div>`);
   }
 
+  // 확정된 회의가 취소됐다는 알림 — "확인"을 누르기 전까지는 계속 떠 있어야 하는
+  // 응답형 항목이라 응답 필요 초대들과 같은 리스트에 둔다.
+  if (!state.incomingCancelNoticeSeen) {
+    const organizer = ATTENDEES.find(a => a.id === INCOMING_CANCEL_NOTICE.organizerId);
+    items.push(`
+      <div class="meeting-item incoming" id="incoming-cancel-notice-item">
+        <div class="meeting-item-left">
+          <span class="meeting-item-time">${INCOMING_CANCEL_NOTICE.title}</span>
+          <span class="meeting-item-count">${organizer.name}님이 취소함 · ${INCOMING_CANCEL_NOTICE.timeLabel}</span>
+          ${INCOMING_CANCEL_NOTICE.location ? `<span class="meeting-item-count">📍 ${INCOMING_CANCEL_NOTICE.location}</span>` : ''}
+        </div>
+        <div class="meeting-item-right">
+          <span class="status-chip status-chip--declined">회의 취소됨</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>`);
+  }
+
   if (items.length === 0) {
     section.style.display = 'none';
     wrap.innerHTML = '';
@@ -2124,7 +2167,30 @@ function renderIncomingList() {
 
   const optionalItem = document.getElementById('incoming-optional-invite-item');
   if (optionalItem) optionalItem.addEventListener('click', openIncomingOptionalInviteSheet);
+
+  const cancelNoticeItem = document.getElementById('incoming-cancel-notice-item');
+  if (cancelNoticeItem) cancelNoticeItem.addEventListener('click', openCancelNoticeDialog);
 }
+
+function openCancelNoticeDialog() {
+  const organizer = ATTENDEES.find(a => a.id === INCOMING_CANCEL_NOTICE.organizerId);
+  document.getElementById('cancel-notice-desc').textContent =
+    `${organizer.name}님이 "${INCOMING_CANCEL_NOTICE.title}" 회의(${INCOMING_CANCEL_NOTICE.timeLabel})를 취소했어요.`;
+  document.getElementById('cancel-notice-overlay').classList.add('open');
+}
+
+function closeCancelNoticeDialog() {
+  document.getElementById('cancel-notice-overlay').classList.remove('open');
+}
+
+document.getElementById('cancel-notice-confirm-btn').addEventListener('click', () => {
+  state.incomingCancelNoticeSeen = true;
+  closeCancelNoticeDialog();
+  renderHome();
+});
+document.getElementById('cancel-notice-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'cancel-notice-overlay') closeCancelNoticeDialog();
+});
 
 // 필참자에게 제안했지만 아직 확정되지 않은 회의 — 응답 진행 상황과 함께 보여주고,
 // 누르면 의견 수집 화면으로 돌아가 이어서 진행할 수 있다.
@@ -2258,6 +2324,17 @@ function completeLogin({ name, email } = {}) {
 
   showToast('로그인됐어요.');
 }
+
+function logout() {
+  document.getElementById('app-shell').style.display = 'none';
+  // completeLogin과 같은 이유로 인라인 값을 박지 않고 비워서 스타일시트가 결정하게 한다.
+  document.getElementById('auth-view').style.display = '';
+  document.getElementById('login-form').reset();
+  setAuthTab('login');
+  showScreen('home');
+}
+
+document.getElementById('logout-btn').addEventListener('click', logout);
 
 document.getElementById('login-form').addEventListener('submit', (e) => {
   e.preventDefault();
