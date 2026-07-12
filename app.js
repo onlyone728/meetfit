@@ -764,7 +764,8 @@ function openAttendeePicker() {
   searchInput.value = '';
   renderPickerList();
   document.getElementById('picker-overlay').classList.add('open');
-  searchInput.focus();
+  // 여기서 검색창에 자동 포커스를 주면 모바일에서 키보드가 바로 올라와 목록을 가려버린다.
+  // 참석자 선택이 우선이니, 검색은 사용자가 검색창을 직접 탭했을 때만 열리게 둔다.
 }
 
 function getPickerMatches() {

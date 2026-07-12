@@ -919,7 +919,9 @@ select.select:focus {
   background: transparent;
   outline: none;
   font-family: inherit;
-  font-size: 15px;
+  /* 16px 미만이면 iOS Safari가 포커스 시 자동으로 화면을 확대해, 100% 너비인
+     바텀시트가 화면을 벗어난 것처럼 보이는 원인이 된다. */
+  font-size: 16px;
   color: var(--color-text);
   width: 100%;
 }
